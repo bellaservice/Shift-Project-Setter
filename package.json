@@ -6,15 +6,25 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "db:new": "supabase migration new",
+    "db:list": "supabase migration list --linked",
+    "db:push": "supabase db push --linked",
+    "db:reset": "supabase db reset",
+    "db:query": "supabase db query",
+    "db:types": "supabase gen types typescript --linked --schema public > src/lib/database.types.ts",
+    "check:secrets": "node scripts/check-bundle-secrets.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "next": "16.3.1",
+    "puppeteer-core": "^25.8.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -23,6 +33,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "supabase": "^2.114.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

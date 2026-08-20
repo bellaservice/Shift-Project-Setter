@@ -37,6 +37,18 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase
+supabase/.temp
+supabase/.branches
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# nested app dependencies + build output (DocMaker is an Electron app;
+# the root /node_modules rule above is anchored and misses it)
+node_modules/
+DocMaker/dist/
+
+# local screenshot scratch
+.tmp-shots/

@@ -1,17 +1,26 @@
-import { BackButton } from "@/components/BackButton";
+import { Screen } from "@/components/Screen";
 import { getWorkers } from "@/lib/queries";
+import { firstParam } from "@/lib/searchParams";
 import { LoggaProjectForm } from "./LoggaProjectForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoggaProjectPage() {
-  const workers = await getWorkers();
+export default async function LoggaProjectPage({
+  searchParams,
+}: {
+  /** `?ny=<id>`: arbetaren som just skapades via "+ Lägg Till" i formuläret. */
+  searchParams: Promise<{ ny?: string | string[] }>;
+}) {
+  const [workers, params] = await Promise.all([getWorkers(), searchParams]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <BackButton />
-      <h1 className="text-xl font-semibold">Logga Project</h1>
-      <LoggaProjectForm workers={workers} />
-    </div>
+    <Screen
+      tone="amber"
+      eyebrow="Project"
+      title="Logga Project"
+      back={{ href: "/", label: "Hem" }}
+    >
+      <LoggaProjectForm workers={workers} newWorkerId={firstParam(params.ny)} />
+    </Screen>
   );
 }

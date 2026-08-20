@@ -1,56 +1,48 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Dropdown, type DropdownItem } from "@/components/Dropdown";
 
-type Option = { value: string; label: string };
-
-const NEW_SENTINEL = "__new__";
-
+/**
+ * En dropdown ur en lista som anvandaren sjalv fyller pa: sista raden i panelen
+ * leder till sidan dar man lagger till ett nytt alternativ.
+ *
+ * Vardet bars av den som anvander faltet, inte av faltet sjalvt -- en rad kan
+ * behova visa nagot bredvid sitt val, och da maste valet synas utanfor.
+ */
 export function SelectWithNew({
   name,
   options,
   newLabel,
   newHref,
-  defaultValue,
+  value,
+  onChange,
   required,
   placeholder,
+  emptyMessage,
 }: {
   name: string;
-  options: Option[];
+  options: DropdownItem[];
   newLabel: string;
   newHref: string;
-  defaultValue?: string;
+  value: string;
+  onChange: (value: string) => void;
   required?: boolean;
   placeholder: string;
+  emptyMessage?: string;
 }) {
   const router = useRouter();
-  const [value, setValue] = useState(defaultValue ?? "");
 
   return (
-    <select
+    <Dropdown
       name={name}
       required={required}
       value={value}
-      onChange={(e) => {
-        const next = e.target.value;
-        if (next === NEW_SENTINEL) {
-          router.push(newHref);
-          return;
-        }
-        setValue(next);
-      }}
-      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-    >
-      <option value="" disabled>
-        {placeholder}
-      </option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-      <option value={NEW_SENTINEL}>+ {newLabel}</option>
-    </select>
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder}
+      emptyMessage={emptyMessage}
+      action={{ label: newLabel, onSelect: () => router.push(newHref) }}
+    />
   );
 }

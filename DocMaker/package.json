@@ -1,0 +1,34 @@
+{
+  "name": "docmaker",
+  "version": "1.0.0",
+  "description": "Offline Arbetsdagbok document builder - fill in a form and export a formatted PDF, no internet required.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win portable"
+  },
+  "author": "Bella Service",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.bellaservice.docmaker",
+    "productName": "DocMaker",
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "config/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "DocMaker-Portable.exe"
+    }
+  }
+}

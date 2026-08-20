@@ -1,0 +1,307 @@
+/* ===========================================================================
+   The day surface.
+
+   The app is a night app: one black page, white ink, amber accent. This file is
+   the other half of that sentence — the same app under daylight — and it is a
+   file of its own rather than a section of globals.css for one reason: it is a
+   translation, not a design. Nothing here invents a shape, a spacing or a type
+   size. Every rule below answers "what is this value's daylight equivalent",
+   and keeping them together is what lets the two themes be compared line by
+   line instead of hunted for.
+
+   It hangs off `<html data-theme="light">`, which ThemeToggle writes and the
+   inline script in layout.tsx restores before the first paint.
+
+   HOW IT REACHES THE WHOLE APP WITHOUT TOUCHING A COMPONENT
+
+   Tailwind v4 compiles `text-white/60` to
+
+       color: color-mix(in oklab, var(--color-white) 60%, transparent)
+
+   — the *variable*, not the hex. So redefining `--color-white` here repaints
+   every white utility in the app at once, opacity variants included: type,
+   hairlines, press states, focus rings, dividers. That is why the light theme
+   is a file of tokens rather than a second set of classes, and why a component
+   written tomorrow is themed on the day it is written without anyone
+   remembering to.
+
+   `--color-black` is deliberately NOT flipped. It is not "the opposite of the
+   ink" in this app — it is the dimmer behind a modal (`bg-black/75`) and the
+   label on the accent slab (`text-black`), and both of those are still black at
+   noon. Black on #638aa9 measures 5.8:1 where white on it measures 3.6:1, so
+   flipping it would have cost the primary button its contrast.
+
+   WHAT STILL HAS TO BE SAID BY HAND
+
+   Three things do not run through a token, and each gets its own block below:
+   the four glass materials (literal rgba, because a material is a recipe rather
+   than a colour), the amber glows baked into `shadow-[...]` utilities, and the
+   backdrop photograph.
+   =========================================================================== */
+
+:root[data-theme="light"] {
+  /* The page. Not #ffffff: the panels ARE white here, and white panes on a
+     white page are invisible — the material collapses into the background and
+     the app becomes a list of hairlines. A hair of grey in the page is what
+     lets the panes read as panes. */
+  --color-night: #eceff3;
+
+  /* The ink. Reading it as "white" is the trick of this file — see above. A
+     blue-grey near-black rather than #000, so it belongs to the same family as
+     the accent instead of sitting on top of it. 15.6:1 on the page. */
+  --color-white: #16202b;
+
+  /* The brand's amber does not survive daylight: #ffb92e on white measures
+     1.7:1 and reads as a highlighter smear. #638aa9 clears 4.6:1, which is what
+     lets it carry the small bold text on a link row and not only fills. */
+  --color-night-accent: #638aa9;
+  --color-night-accent-soft: rgba(99, 138, 169, 0.16);
+
+  --color-night-line: rgba(22, 32, 43, 0.12);
+  --color-night-raised: rgba(22, 32, 43, 0.08);
+
+  /* The status pair, moved down a rung rather than kept. The -400s were picked
+     to survive black; on white they are pastel and neither clears 4.5:1. */
+  --color-night-danger: #c0392f;
+  --color-night-ok: #157f56;
+
+  color-scheme: light;
+}
+
+/* ---------------------------------------------------------------------------
+   The materials.
+
+   Every one of them inverts the same way: the black base becomes a white one
+   and the white sheen becomes a dark hairline, because the job never changed —
+   a pane still has to separate itself from what is behind it, and it still does
+   that by being denser than its backdrop and lit along its top edge. What
+   changes is which direction "denser" points.
+   --------------------------------------------------------------------------- */
+
+/* The card. Still glass, and the numbers say so: the night pane is a white
+   sheen over a 45% black base and lets the room through, and this is the same
+   pane with the base turned white. It is NOT a sheet of white paper — an opaque
+   card is the one thing that would make the daylight theme a different app
+   rather than the same app in daylight, and over the header photograph it is
+   also the difference between a pane the bokeh refracts through and a rectangle
+   sitting on top of the picture.
+
+   The density it does carry is the mirror of the night theme's argument. Black
+   at 45% is there to pull a bright backdrop DOWN before white type lands on it;
+   white at 55% is here to push a dark backdrop UP before near-black type lands
+   on it. Composited it comes out around 70% white, which puts the ink at 11:1
+   even where the card overlaps the darkest part of the photograph. */
+:root[data-theme="light"] .glass {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.34) 0%,
+      rgba(255, 255, 255, 0.16) 48%,
+      rgba(255, 255, 255, 0.12) 100%
+    ),
+    linear-gradient(rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.62));
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid rgba(22, 32, 43, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
+    0 10px 28px -16px rgba(22, 32, 43, 0.4);
+}
+
+/* The surface inside a surface. Darker than its parent here where on black it
+   was lighter — "inside" is drawn by moving away from the page's own value in
+   whichever direction the page leaves room for. */
+:root[data-theme="light"] .glass-flat {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(22, 32, 43, 0.05) 0%,
+      rgba(22, 32, 43, 0.02) 100%
+    ),
+    linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5));
+  border: 1px solid rgba(22, 32, 43, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* The field. Still the thing you look *into* rather than at, so it still sinks:
+   a faint grey wash and an inset top shadow, which is the daylight version of
+   the heavier black the night theme sinks it with. */
+:root[data-theme="light"] .glass-field {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(22, 32, 43, 0.06) 0%,
+      rgba(22, 32, 43, 0.025) 100%
+    ),
+    linear-gradient(rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.86));
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
+  border: 1px solid rgba(22, 32, 43, 0.16);
+  box-shadow: inset 0 1px 2px rgba(22, 32, 43, 0.07);
+  color: #16202b;
+}
+
+/* Focus, and the trigger of an open dropdown, in the accent rather than in
+   white: a white ring is invisible on paper, and this is the one signal in the
+   app that must never be missable. */
+:root[data-theme="light"] .glass-field:focus-within,
+:root[data-theme="light"] .glass-field:focus-visible,
+:root[data-theme="light"] .glass-field:focus,
+:root[data-theme="light"] .glass-field[data-state="open"] {
+  border-color: rgba(99, 138, 169, 0.9);
+  box-shadow:
+    inset 0 1px 2px rgba(22, 32, 43, 0.07),
+    0 0 0 3px rgba(99, 138, 169, 0.22);
+}
+
+:root[data-theme="light"] .glass-field:user-invalid {
+  border-color: rgba(192, 57, 47, 0.75);
+}
+
+/* The floating menu. Its density argument is unchanged, and the reason with it:
+   a panel opening inside a card gets no blur, so it cannot borrow legibility
+   from one. Only the direction of the density flips. */
+:root[data-theme="light"] .glass-overlay {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.99) 0%,
+      rgba(255, 255, 255, 0.99) 100%
+    ),
+    linear-gradient(rgba(255, 255, 255, 0.99), rgba(255, 255, 255, 0.99));
+  border: 1px solid rgba(22, 32, 43, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 26px 64px -22px rgba(22, 32, 43, 0.45);
+}
+
+/* ---------------------------------------------------------------------------
+   The base layer.
+   --------------------------------------------------------------------------- */
+
+:root[data-theme="light"] body {
+  color: #16202b;
+}
+
+/* .42 where the night theme uses .38: a placeholder has to stay clearly lighter
+   than a real value, and grey on white needs a little more of itself than grey
+   on black does before it is visible at all. */
+:root[data-theme="light"] ::placeholder {
+  color: rgba(22, 32, 43, 0.42);
+}
+
+:root[data-theme="light"] ::selection {
+  background-color: rgba(99, 138, 169, 0.3);
+  color: #0d1620;
+}
+
+/* The autofill cover-up, inverted: Chrome's autofill fill is a light colour, so
+   here it takes a white block rather than a black one. */
+:root[data-theme="light"] input:-webkit-autofill,
+:root[data-theme="light"] input:-webkit-autofill:hover,
+:root[data-theme="light"] input:-webkit-autofill:focus,
+:root[data-theme="light"] textarea:-webkit-autofill {
+  -webkit-text-fill-color: #16202b;
+  caret-color: #16202b;
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.96) inset;
+}
+
+/* The heading halo, on the five screens whose backdrop is a glow rather than a
+   picture. The night theme stacks black shadows there so white type survives
+   the photograph; near-black type on a pale glow needs the opposite, and on the
+   glow tones it is invisible either way — it is insurance for the edge case
+   where a card scrolls up behind the title.
+
+   `header.app-chrome` and not `.app-chrome`: the top bar carries the same class,
+   and its labels sit on glass pills where a halo is noise. */
+:root[data-theme="light"] header.app-chrome h1,
+:root[data-theme="light"] header.app-chrome p {
+  text-shadow:
+    0 0 3px rgba(255, 255, 255, 0.95),
+    0 1px 6px rgba(255, 255, 255, 0.85);
+}
+
+/* ---------------------------------------------------------------------------
+   The heading on the screens that have a photograph under it — Home, and both
+   archives.
+
+   The daylight film over the picture is the night film's film, to the percent
+   (see Backdrop) — which means the top of these screens is an undimmed
+   photograph, and this one is dark. Near-black type does not survive that at
+   any halo strength, so the two lines do what the night theme does and go
+   white.
+
+   `veil` is in here with `photo` and not on a rule of its own. At night the two
+   tones are genuinely different rooms — one lit, one with the lights off — but
+   in daylight there is no dimming a picture with white, only bleaching it, so
+   the archives carry the same undimmed photograph Home does and therefore owe
+   their headings the same treatment. Two selectors sharing one block is the
+   only honest way to write that: the day they diverge, they can split.
+
+   The halo is navy rather than black. Black on a photograph this dark is a
+   shadow you cannot see, so it thickens the glyphs without separating them from
+   anything; the navy is off the same blue the accent comes from, dark enough to
+   carry the white and coloured enough to read as an edge rather than as dirt.
+   The eyebrow gets its own denser stack for the reason it does in the night
+   theme: at 11px with 0.2em tracking a wide soft blur washes straight through
+   the strokes, and only zero-offset blurs bank up enough density around a glyph
+   that thin.
+   --------------------------------------------------------------------------- */
+:root[data-theme="light"] [data-tone="photo"] header.app-chrome h1,
+:root[data-theme="light"] [data-tone="veil"] header.app-chrome h1 {
+  color: #ffffff;
+  text-shadow:
+    0 1px 3px rgba(13, 27, 42, 0.95),
+    0 2px 14px rgba(13, 27, 42, 0.85);
+}
+
+:root[data-theme="light"] [data-tone="photo"] header.app-chrome p,
+:root[data-theme="light"] [data-tone="veil"] header.app-chrome p {
+  color: #ffffff;
+  text-shadow:
+    0 0 2px rgba(13, 27, 42, 0.98),
+    0 0 4px rgba(13, 27, 42, 0.98),
+    0 0 9px rgba(13, 27, 42, 0.95),
+    0 0 18px rgba(13, 27, 42, 0.9);
+}
+
+/* ---------------------------------------------------------------------------
+   The glows baked into `shadow-[...]`.
+
+   The amber halo under the primary button and around the current month's card
+   is written as a literal rgba inside a Tailwind arbitrary value, so no token
+   can reach it. It does not need to: v4 compiles every stop as
+   `var(--tw-shadow-color, <literal>)`, so setting that one variable on the
+   element re-colours the whole shadow. One declaration per hook, and the button
+   keeps its light — it just stops being amber.
+   --------------------------------------------------------------------------- */
+:root[data-theme="light"] .bg-night-accent,
+:root[data-theme="light"] [class*="ring-night-accent"] {
+  --tw-shadow-color: rgba(99, 138, 169, 0.55);
+}
+
+/* The pressed state of the accent slab is a hand-picked darker amber sitting in
+   an `active:bg-[#e5a41f]` utility — again no token to reach. Specificity does
+   the work rather than `!important`: `:root[data-theme]` plus the class plus
+   the pseudo-class outranks the utility's own two. */
+:root[data-theme="light"] .bg-night-accent:active {
+  background-color: #52768f;
+}
+
+/* ---------------------------------------------------------------------------
+   The photograph and the light in the room.
+
+   Backdrop renders both themes' layers and lets CSS pick, rather than reading
+   the theme in JS: it is a server component, the theme is only known in the
+   browser, and a picture that swaps one frame after hydration is a flash on
+   every navigation. Two layers and a display rule cost one extra image and
+   nothing else.
+   --------------------------------------------------------------------------- */
+.theme-light-only {
+  display: none;
+}
+
+:root[data-theme="light"] .theme-light-only {
+  display: block;
+}
+
+:root[data-theme="light"] .theme-dark-only {
+  display: none;
+}

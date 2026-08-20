@@ -1,9 +1,23 @@
-import Link from "next/link";
-import { StatCard } from "@/components/StatCard";
+import { ActionRow, PanelList, RowLink, RowMeta } from "@/components/Panel";
+import { CountBadge, EmptyState, Screen, SectionHeading } from "@/components/Screen";
+import { StatCard, StatRow } from "@/components/StatCard";
+import { formatHoursSv, formatMonthNameSv, projectLabel } from "@/lib/format";
 import { getHomeStats, getOngoingProjects } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Hem.
+ *
+ * The screen that set the app's look, and now the screen with the least markup
+ * of its own: the backdrop, the bar and the heading live in <Screen>, the two
+ * big buttons in <ActionRow>, the tiles in <StatRow>, and the list in
+ * <PanelList>. What is left here is which numbers to show and in what order —
+ * which is the only thing that was ever specific to Home.
+ *
+ * It keeps two things nothing else has: the photograph (`tone="photo"`) and the
+ * larger wordmark (`hero`). Both say the same thing — this is the front door.
+ */
 export default async function Home() {
   const [stats, ongoingProjects] = await Promise.all([
     getHomeStats(),
@@ -11,68 +25,75 @@ export default async function Home() {
   ]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Shift Setting System</h1>
-        <Link
+    <Screen tone="photo" eyebrow="Översikt" hero title={<>Bella<br />Service</>}>
+      {/* Row 2: three stat tiles plus the add-worker tile. Four equal columns,
+          all four rendered by StatCard, so the tiles are the same width and
+          their labels and values sit on the same lines — inside one panel
+          divided by hairlines rather than as four separate bordered boxes. */}
+      <StatRow label="Nyckeltal">
+        <StatCard
+          label={"Loggade\nTimmar"}
+          value={`${formatHoursSv(stats.totalHours)}h`}
+        />
+        <StatCard label={"Aktiva\nProject"} value={stats.activeProjectCount} />
+        {/* Third tile, the one adjacent to "Lägg Till Arbetare" (spec 4.1
+            Interpretation H). Replaces the scaffold's "Totalt Arbetare", which
+            the locked spec's three-box stat row does not contain. */}
+        <StatCard
+          label={"Månads\npass"}
+          value={stats.monthShiftCount}
+          subtitle={formatMonthNameSv(stats.monthStart)}
+        />
+        <StatCard
+          label={"Lägg Till\nArbetare"}
+          value="+"
           href="/ny-arbetare"
-          aria-label="Lagg Till Arbetare"
-          title="Lagg Till Arbetare"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-lg text-white"
-        >
-          +
-        </Link>
+          action
+        />
+      </StatRow>
+
+      {/* Rows 3 and 4: the two primary actions, full width and stacked. */}
+      <div className="flex flex-col gap-2.5">
+        <ActionRow href="/logga-project" label="Logga Project" />
+        <ActionRow href="/logga-timmar" label="Logga Timmar" />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Loggade Timmar" value={stats.totalHoursLogged} />
-        <StatCard label="Aktiva Project" value={stats.activeProjectCount} />
-        <StatCard label="Totalt Arbetare" value={stats.totalWorkerCount} />
-      </div>
-
-      <div className="flex gap-3">
-        <Link
-          href="/logga-project"
-          className="flex-1 rounded-lg bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white"
+      <section>
+        <SectionHeading
+          aside={
+            ongoingProjects.length > 0 && (
+              <CountBadge>{ongoingProjects.length}</CountBadge>
+            )
+          }
         >
-          + Logga Project
-        </Link>
-        <Link
-          href="/logga-timmar"
-          className="flex-1 rounded-lg bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white"
-        >
-          + Logga Timmar
-        </Link>
-      </div>
+          Pågående Project
+        </SectionHeading>
 
-      <div>
-        <h2 className="mb-2 text-sm font-medium text-slate-500">
-          Pagaende Project
-        </h2>
         {ongoingProjects.length === 0 ? (
-          <p className="text-sm text-slate-500">Inga pagaende project an.</p>
+          <EmptyState
+            title="Inga pågående project än."
+            hint="Lägg upp det första med Logga Project."
+          />
         ) : (
-          <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+          <PanelList>
             {ongoingProjects.map((p) => (
-              <Link
+              <RowLink
                 key={p.id}
                 href={`/logga-project/${p.id}`}
-                className="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-slate-50"
-              >
-                <div className="min-w-0">
-                  <div className="truncate font-medium">{p.address}</div>
-                  <div className="truncate text-xs text-slate-500">
-                    {p.serviceNames.length > 0
-                      ? p.serviceNames.join(", ")
-                      : "Inga tjanster"}
-                  </div>
-                </div>
-                <div className="shrink-0 font-medium">{p.totalHours} tim</div>
-              </Link>
+                title={projectLabel(p)}
+                subtitle={
+                  p.serviceNames.length > 0
+                    ? p.serviceNames.join(", ")
+                    : "Inga tjänster"
+                }
+                meta={
+                  <RowMeta value={`${formatHoursSv(p.totalHours)}h`} label="Timmar" />
+                }
+              />
             ))}
-          </div>
+          </PanelList>
         )}
-      </div>
-    </div>
+      </section>
+    </Screen>
   );
 }

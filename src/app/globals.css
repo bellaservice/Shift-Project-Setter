@@ -1,6 +1,335 @@
 @import "tailwindcss";
 
+/* The same app under daylight — tokens and materials only, no new shapes.
+   Imported here rather than written here so the two themes stay comparable
+   side by side instead of interleaved. See the file for how one variable
+   repaints every `text-white/60` in the app. */
+@import "./theme-light.css";
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+/* ---------------------------------------------------------------------------
+   The "night" palette — the app's one surface, named by role rather than by
+   value so no component carries a raw hex.
+
+   The accent is the company's own amber, sampled from the sun in bella-logo.png
+   (#ffb92e is the logo's single most-used hue, ahead of its red and its blue).
+   It earns the slot twice over: it is the brand's colour rather than a borrowed
+   one, and amber sits near-opposite the deep emerald of the header photo on the
+   wheel, so it separates from the background instead of dissolving into it the
+   way a green accent does.
+
+   The two status hues are the -400 rung of their family, not the -600 the light
+   theme used: on black a 600 is a dark smudge. Both clear 4.5:1 against #000,
+   which is what lets them carry small text rather than only fills.
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-night: #000000;
+  --color-night-raised: rgba(255, 255, 255, 0.12);
+  --color-night-line: rgba(255, 255, 255, 0.1);
+  --color-night-accent: #ffb92e;
+  /* The accent at panel strength: a tint a whole card can sit on without the
+     amber shouting over the text inside it. */
+  --color-night-accent-soft: rgba(255, 185, 46, 0.14);
+  --color-night-danger: #f87171;
+  --color-night-ok: #34d399;
+}
+
+/* ---------------------------------------------------------------------------
+   Liquid glass. One definition for every panel in the app, so the material is
+   identical whether it is a 44px button or a full-width stat card, and there is
+   a single place to tune it.
+
+   What makes it read as glass rather than as a grey box:
+   - the tint is a top-to-bottom *gradient*, not a flat fill, so the surface
+     looks lit from above;
+   - `saturate` on the backdrop pushes the colour of whatever is behind it, so
+     the leaves bloom through the panels that overlap the photo;
+   - the two inset shadows are the specular edges — a bright hairline catching
+     the light along the top, a dim bounce along the bottom — which is what
+     gives the pane thickness;
+   - the outer shadow lifts it off the black so it floats rather than sits.
+
+   Every stop is translucent on purpose: `background-image` composites over
+   `background-color`, so a plain `active:bg-white/12` still shows through the
+   gradient and works as a press state without a second material.
+   --------------------------------------------------------------------------- */
+@utility glass {
+  /* Two layers, front to back: the white sheen that lights the pane from above,
+     and a flat black base under it.
+
+     The base is what makes the material *adaptive*. Over the black half of the
+     page it changes nothing — black on black — but over the bright half it
+     pulls the backdrop down before any text lands on it. Without it a pane sat
+     on a bokeh highlight only ever got lighter, and white text on that measured
+     3.1:1. Glass that brightens whatever is behind it is not glass; real panes
+     carry their own density, and this is that density.
+
+     It lives in `background-image`, not `background-color`, so the colour slot
+     stays free for `active:` to paint a press state underneath. */
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.13) 0%,
+      rgba(255, 255, 255, 0.06) 48%,
+      rgba(255, 255, 255, 0.045) 100%
+    ),
+    linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
+  -webkit-backdrop-filter: blur(28px) saturate(175%);
+  backdrop-filter: blur(28px) saturate(175%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 32px -12px rgba(0, 0, 0, 0.9);
+}
+
+/* The same material with no backdrop-filter and no drop shadow, for a surface
+   that sits INSIDE another one — a fieldset in a form card, a warning strip in
+   a panel. Blurring a backdrop that is itself already blurred costs a second
+   full-screen filter pass and returns nothing but mud, and a drop shadow inside
+   a pane reads as a crack rather than as depth. */
+@utility glass-flat {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.035) 100%
+    ),
+    linear-gradient(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.25));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* ---------------------------------------------------------------------------
+   The card an open dropdown belongs to outranks the cards below it.
+
+   `glass` carries a backdrop-filter, and a backdrop-filter makes the element a
+   stacking context of its own. The panel's `z-30` is therefore only a ranking
+   INSIDE its own card; between the cards each pane is a sibling at the same
+   level, and the one later in the document paints last. That is what put the
+   month and day lists on Logga Project *behind* the Bestallare card as soon as
+   they were tall enough to reach it.
+
+   So the card is lifted, not the panel — nothing inside a stacking context can
+   climb out of it, however high its own z-index goes. 20 clears the sibling
+   panes (which rank at 0) and stays under the dimmers and sheets at 40-60, so
+   an open dropdown still goes behind a modal or the menu when one takes over
+   the screen.
+   --------------------------------------------------------------------------- */
+.glass:has([data-dropdown-panel]) {
+  position: relative;
+  z-index: 20;
+}
+
+/* ---------------------------------------------------------------------------
+   The floating material: dropdown panels, the nav sheet, the cog menu, and both
+   confirmation dialogs.
+
+   It exists because `glass` cannot be trusted to be readable when it floats.
+   `backdrop-filter` only samples the backdrop of its own *backdrop root*, and
+   any ancestor that is itself filtered becomes one — so a `glass` dropdown
+   panel opening inside a `glass` form card gets NO blur at all, and what was a
+   frosted pane over the form becomes a 45%-black tint over perfectly legible
+   text showing straight through it. That is not a subtle degradation; it is two
+   screens of type on top of each other.
+
+   So this material does not rely on the blur for its density. It carries a base
+   heavy enough to read on by itself, and the blur is left in as the thing that
+   makes it look like glass rather than the thing that makes it work.
+
+   The base is 0.99 — near enough to opaque that what the panel covers is gone
+   rather than dimmed — and it has to be, for two reasons. The blur is simply
+   not available where the dropdowns are: a panel opening inside a `glass` card
+   sits in that card's backdrop root, so its own filter hands back the backdrop
+   unblurred and the type behind it stays sharp (measured in Chrome, not
+   assumed). And the time wheel fades its own rows out to transparent at the
+   top and bottom of its mask, so what does come through comes through exactly
+   where the panel has the least ink of its own: at 0.88 "Pass Datum" and the
+   date fields read straight through the gap between the two columns of
+   numbers, and they were still legible at 0.95 and faintly there at 0.97. A
+   panel over a live form has no dimmer beneath it the way the sheets and the
+   dialogs do, so it has to do that work itself.
+
+   The rule: anything that OVERLAPS other content is `glass-overlay`; anything
+   that sits IN the flow beside other content is `glass`.
+   --------------------------------------------------------------------------- */
+@utility glass-overlay {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    ),
+    linear-gradient(rgba(6, 6, 6, 0.99), rgba(6, 6, 6, 0.99));
+  -webkit-backdrop-filter: blur(28px) saturate(175%);
+  backdrop-filter: blur(28px) saturate(175%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 26px 64px -18px rgba(0, 0, 0, 0.95);
+}
+
+/* ---------------------------------------------------------------------------
+   The form-control material: inputs, textareas, dropdown triggers, and the
+   wrappers that hold a prefix beside an input.
+
+   Deliberately DARKER than `glass`, not lighter. A panel is a thing you look
+   at, so it is lifted off the page; a field is a thing you look *into*, so it
+   is sunk into it. The heavier black base is also what buys the contrast — a
+   value typed in white sits on this, and on a lit panel it would not clear
+   4.5:1 once the field overlapped the header photo.
+
+   The states are attached to the utility rather than sprinkled as separate
+   classes, so focus cannot be forgotten on one field and present on the next,
+   and so `[data-state=open]` outranks whatever border utility a caller adds.
+   --------------------------------------------------------------------------- */
+@utility glass-field {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    ),
+    linear-gradient(rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.58));
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+
+  /* `:focus-within` covers both the bare input and the wrapper that holds one;
+     `:focus-visible` is what a button trigger gets from the keyboard. Mouse
+     focus on a trigger is included on purpose — a dropdown about to open should
+     already look armed. */
+  &:focus-within,
+  &:focus-visible,
+  &:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 0 0 3px rgba(255, 255, 255, 0.14);
+  }
+
+  /* An open dropdown keeps the armed look while focus has moved into its panel,
+     which is where the keyboard actually is. */
+  &[data-state="open"] {
+    border-color: rgba(255, 255, 255, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 0 0 3px rgba(255, 255, 255, 0.14);
+  }
+
+  /* A field the browser marked invalid after the user has had their turn at it.
+     Red rather than amber so it cannot be read as "focused", and paired with
+     the message in the browser's own bubble — colour is never the only carrier. */
+  &:user-invalid {
+    border-color: rgba(248, 113, 113, 0.8);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Base layer: the app is one dark surface end to end.
+
+   `color-scheme: dark` on <html> is doing more work than it looks like — it is
+   what repaints the scrollbar, the overscroll gutter, the file picker button,
+   the browser's own validation bubble and the native spinners. Skip it and
+   every one of those flashes light grey against the page.
+   --------------------------------------------------------------------------- */
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: var(--color-night);
+  }
+
+  /* Note what is NOT here: a background on <body>.
+
+     The black belongs to <html> alone. Give <body> one as well and it stops
+     propagating to the canvas and becomes an ordinary painted box background —
+     and in CSS paint order that lands *above* negative-z-index descendants,
+     which is exactly where Backdrop lives (`fixed inset-0 -z-10`). An opaque
+     body therefore hides the header photograph and every glow on every screen,
+     leaving a flat black app with no way to tell that anything is wrong except
+     that the picture is missing. <html> already covers the canvas, so body has
+     nothing left to paint. */
+  body {
+    color: #ffffff;
+  }
+
+  /* One focus ring for the whole app, in the brand's amber.
+
+     The browser's own ring is a blue-ish hairline tuned for light pages; on
+     black it is both off-palette and easy to lose. This replaces it everywhere
+     at once rather than per component, which is the only way a focus style
+     stays complete — a ring added button by button is a ring that is missing
+     from the next button somebody writes.
+
+     `:where()` so the rule carries zero specificity: `glass-field` draws its
+     own amber border and ring on focus and needs to win here without
+     `!important`, and it does, because anything beats nothing.
+
+     `:focus-visible`, not `:focus` — a ring around every element a thumb has
+     just tapped is noise, and the keyboard is the only place it is information. */
+  :where(a, button, [role="option"], [role="menuitem"], [role="radio"], summary):focus-visible {
+    outline: 2px solid var(--color-night-accent);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+
+  /* One placeholder tone everywhere. Held at .38 rather than the .5 a light
+     theme would use: on black, half-white placeholder text is bright enough to
+     be mistaken for a value that is already filled in. */
+  ::placeholder {
+    color: rgba(255, 255, 255, 0.38);
+  }
+
+  ::selection {
+    background-color: rgba(255, 185, 46, 0.3);
+    color: #ffffff;
+  }
+
+  /* Checkboxes are left native — a custom control here would lose the
+     platform's own focus ring and screen-reader wiring for nothing — but their
+     fill follows the brand. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-night-accent);
+  }
+
+  /* Chrome paints autofilled fields with an opaque near-white that
+     `background-color` cannot override; the inset shadow is the standard way to
+     cover it, and the absurd transition delay is what stops it flashing back on
+     re-render. Without this, the one field the browser remembers is a white
+     block in the middle of a dark form. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill {
+    -webkit-text-fill-color: #ffffff;
+    caret-color: #ffffff;
+    -webkit-box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.72) inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+}
+
+/* The Arbetsdagbok is a white A4 document living inside a black app. It brings
+   its own stylesheet (see Arbetsdagbok.tsx) and paints its own sheets, but the
+   print run has to undo the dark body or Chrome fills every margin with black. */
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color-scheme: light;
+  }
+
+  /* The app's own furniture never reaches the paper. `app-backdrop` matters
+     most: it is a fixed, opaque, full-viewport black layer, and page.pdf runs
+     with printBackground on — left in, it prints as a black sheet with the
+     document invisible underneath it. `app-chrome` is the bar and the heading,
+     which would otherwise land across the top of page one of the PDF. */
+  .app-backdrop,
+  .app-chrome {
+    display: none !important;
+  }
 }

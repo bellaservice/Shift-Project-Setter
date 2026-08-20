@@ -1,5 +1,5 @@
-import { BackButton } from "@/components/BackButton";
 import { RecentShiftsList } from "@/components/RecentShiftsList";
+import { Screen, SectionHeading } from "@/components/Screen";
 import { getProjects, getRecentShiftsForProject, getWorkers } from "@/lib/queries";
 import { LoggaTimmarForm } from "./LoggaTimmarForm";
 
@@ -19,21 +19,27 @@ export default async function LoggaTimmarPage({
   ]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <BackButton />
-      <h1 className="text-xl font-semibold">Logga Timmar</h1>
+    <Screen
+      tone="amber"
+      eyebrow="Tidrapport"
+      title="Logga Timmar"
+      back={{ href: "/", label: "Hem" }}
+    >
       <LoggaTimmarForm
         projects={projects}
         workers={workers}
         selectedProjectId={selectedProjectId ?? ""}
       />
 
+      {/* Historiken dyker upp forst nar ett project ar valt, och da direkt
+          under formularet: den ar facit pa det man just har skrivit in — "log
+          jag redan det har passet?" — och inte en egen avdelning pa sidan. */}
       {selectedProjectId && (
-        <div>
-          <h2 className="mb-2 text-sm font-medium text-slate-500">Senaste Pass</h2>
+        <section className="mt-2">
+          <SectionHeading>Senaste Pass</SectionHeading>
           <RecentShiftsList shifts={recentShifts} />
-        </div>
+        </section>
       )}
-    </div>
+    </Screen>
   );
 }

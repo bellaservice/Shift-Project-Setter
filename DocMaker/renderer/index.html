@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self' data:; object-src 'self' data:;">
+<title>DocMaker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="toolbar-brand">
+      <span class="brand-mark">
+        <img id="brandLogoImg" class="brand-logo-img" src="../assets/logo.png" alt="Bella Service">
+        <span id="brandLogoFallback" class="brand-logo-fallback" hidden>BS</span>
+      </span>
+      <span class="toolbar-title">Bella Service - Arbetsdagbok</span>
+    </div>
+    <div class="toolbar-actions">
+      <button id="openDraftBtn" class="btn btn-ghost" type="button">Öppna utkast</button>
+      <button id="clearBtn" class="btn btn-ghost" type="button">Rensa allt</button>
+      <button id="generateBtn" class="btn btn-primary" type="button">Generera Document</button>
+    </div>
+  </header>
+
+  <main class="canvas">
+    <section class="editor-column">
+      <div class="page-frame" id="pageFrame">
+        <div class="page-header">
+          <div class="logo-wrap">
+            <img id="logoImg" class="logo-img" src="../assets/logo.png" alt="Logo">
+            <div id="logoFallback" class="logo-fallback"><span>Logo</span></div>
+          </div>
+          <h1 class="page-title">Arbetsdagbok</h1>
+        </div>
+
+        <div class="cover-section" id="coverSection">
+          <div class="cover-group-label">Beställare</div>
+
+          <div class="cover-field-row">
+            <label class="cover-checkbox"><input type="checkbox" id="chkAdress" checked><span>Adress</span></label>
+            <textarea id="valAdress" class="cover-input" rows="2" placeholder="Gatuadress&#10;Postnr och ort"></textarea>
+          </div>
+          <div class="cover-field-row">
+            <label class="cover-checkbox"><input type="checkbox" id="chkBolag" checked><span>Bolag</span></label>
+            <input type="text" id="valBolag" class="cover-input" placeholder="Företagsnamn">
+          </div>
+          <div class="cover-field-row">
+            <label class="cover-checkbox"><input type="checkbox" id="chkOrgnr" checked><span>Org nummer</span></label>
+            <input type="text" id="valOrgnr" class="cover-input" placeholder="XXXXXX-XXXX">
+          </div>
+
+          <div class="cover-field-row cover-project-row">
+            <span class="cover-group-label cover-project-label">Project</span>
+            <input type="text" id="valProject" class="cover-input" placeholder="Projektnamn eller nummer">
+          </div>
+        </div>
+
+        <div id="daysContainer"></div>
+
+        <button id="newDayBtn" class="btn btn-pill" type="button">+ Nytt Pass</button>
+
+        <footer class="page-footer" id="pageFooter">
+          <div class="footer-col">
+            <span id="fPostadressLabel"></span>
+            <span id="fAddress"></span>
+          </div>
+          <div class="footer-col">
+            <span id="fPhoneLine"></span>
+          </div>
+          <div class="footer-col footer-legal">
+            <span id="fBankgiroLine"></span>
+            <span id="fOrgnote"></span>
+            <span id="fOrgnrLine"></span>
+            <span id="fMomsregLine"></span>
+          </div>
+        </footer>
+      </div>
+    </section>
+
+    <aside class="preview-column">
+      <div class="preview-sticky">
+        <div class="preview-label">Förhandsgranskning</div>
+        <div class="preview-viewport">
+          <iframe id="previewFrame" class="preview-frame" title="Förhandsgranskning av dokumentet"></iframe>
+          <div id="previewEmpty" class="preview-empty" hidden>Fyll i minst en rad för att se förhandsgranskningen</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <template id="dayTemplate">
+    <section class="day-block">
+      <div class="day-head">
+        <input type="text" class="date-input" placeholder="20XX-XX-XX" value="">
+        <button class="btn btn-icon remove-day" type="button" title="Ta bort dag">&times;</button>
+      </div>
+      <div class="rows-table">
+        <div class="row row-head">
+          <div class="cell">Arbetare</div>
+          <div class="cell">Pass Timmar</div>
+          <div class="cell">Pass typ</div>
+          <div class="cell cell-project">Project</div>
+          <div class="cell cell-remove"></div>
+        </div>
+        <div class="rows-list"></div>
+      </div>
+      <button class="btn btn-pill btn-small new-row" type="button">+ Ny Rad</button>
+    </section>
+  </template>
+
+  <template id="rowTemplate">
+    <div class="row">
+      <div class="cell"><input type="text" data-field="arbetare" placeholder=""></div>
+      <div class="cell"><input type="text" data-field="passTyp1" placeholder=""></div>
+      <div class="cell"><input type="text" data-field="passTyp2" placeholder=""></div>
+      <div class="cell cell-project"><input type="text" data-field="project" placeholder=""></div>
+      <div class="cell cell-remove"><button class="btn btn-icon remove-row" type="button" title="Ta bort rad">&times;</button></div>
+    </div>
+  </template>
+
+  <div id="toast" class="toast" hidden>
+    <span id="toastText"></span>
+    <div class="toast-actions">
+      <button id="toastOpen" class="btn btn-ghost btn-small" type="button">Öppna</button>
+      <button id="toastFolder" class="btn btn-ghost btn-small" type="button">Visa i mapp</button>
+      <button id="toastClose" class="btn btn-icon" type="button">&times;</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

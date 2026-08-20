@@ -1,9 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Dropdown } from "@/components/Dropdown";
 
-const NEW_SENTINEL = "__new__";
-
+/**
+ * Valt project ligger i adressen och inte i state: sidan hamtar "Senaste Pass"
+ * for projectet pa servern, sa ett val maste ga vagen om URL:en.
+ */
 export function LoggaTimmarProjectSelect({
   options,
   value,
@@ -14,29 +17,17 @@ export function LoggaTimmarProjectSelect({
   const router = useRouter();
 
   return (
-    <select
+    <Dropdown
       name="project_id"
       required
       value={value}
-      onChange={(e) => {
-        const next = e.target.value;
-        if (next === NEW_SENTINEL) {
-          router.push("/logga-project");
-          return;
-        }
-        router.replace(next ? `/logga-timmar?project=${next}` : "/logga-timmar");
-      }}
-      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-    >
-      <option value="" disabled>
-        Valj project
-      </option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-      <option value={NEW_SENTINEL}>+ Nytt Project</option>
-    </select>
+      onChange={(next) =>
+        router.replace(next ? `/logga-timmar?project=${next}` : "/logga-timmar")
+      }
+      options={options}
+      placeholder="Valj project"
+      action={{ label: "Nytt Project", onSelect: () => router.push("/logga-project") }}
+      emptyMessage="Inga project ännu."
+    />
   );
 }

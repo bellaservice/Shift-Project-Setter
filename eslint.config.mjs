@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // DocMaker is the offline Electron builder this app's Arbetsdagbok is
+    // ported from. It is vendored here as a reference, has its own toolchain,
+    // and is not part of the Next.js app.
+    "DocMaker/**",
   ]),
 ]);
 
