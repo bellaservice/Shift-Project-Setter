@@ -1,3 +1,10 @@
+/* Loggan importeras och namns inte med sin URL. Dokumentet ar en riktig sida som
+   Chrome skriver ut till PDF, sa en bild som inte laddar blir ett tomt hal i
+   sidhuvudet pa varje ark — och pa GitHub Pages ligger sajten under
+   /Shift-Project-Setter/, dar `/bella-logo.png` pekar forbi prefixet och ger
+   404. Bundlern skriver ut ratt URL. Plain `<img>` och inte `<Image>`: den har
+   sidan ar A4 med egna matt i millimeter, inte ett responsivt layoutblock. */
+import logo from "../../public/bella-logo.png";
 import { COMPANY } from "@/lib/company";
 import { formatHoursSv } from "@/lib/format";
 import type { ArbetsdagbokData } from "@/lib/types";
@@ -212,7 +219,7 @@ function DocumentHeader() {
           och den enda storlek som betyder något här är de 24mm stylesheeten
           sätter för papperet. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="ad-logo" src="/bella-logo.png" alt="Bella Service" />
+      <img className="ad-logo" src={logo.src} alt="Bella Service" />
       <div className="ad-title">Arbetsdagbok</div>
     </div>
   );

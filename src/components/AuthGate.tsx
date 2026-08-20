@@ -1,6 +1,15 @@
 "use client";
 
 import Image from "next/image";
+/* Importerad och inte `src="/yellow.jpg"`, av samma skal som Backdrop importerar
+   sina foton — plus ett som bara galler i drift: sajten ligger under
+   /Shift-Project-Setter/ pa GitHub Pages, och en strang som borjar med `/` pekar
+   forbi det prefixet, rakt pa domanens rot. `basePath` raddar den inte heller:
+   det prefixet laggs pa optimerarens URL, och exporten kor `images.unoptimized`,
+   som skickar vidare `src` precis som den star. Resultatet ar 404 pa loggan i
+   det enda som syns nar man inte ar inloggad. En import gar genom bundlern, som
+   skriver ut ratt URL med prefix och innehallshash. */
+import logo from "../../public/yellow.jpg";
 import { useState } from "react";
 import { Button } from "@/components/Button";
 import { FIELD_BOX } from "@/components/Field";
@@ -83,10 +92,8 @@ function LoginForm() {
           tonar in efter formularet under den ar en sida som ser trasig ut i ett
           ogonblick. Ingen `sizes` behovs — bilden ar aldrig bredare an 224px. */}
       <Image
-        src="/yellow.jpg"
+        src={logo}
         alt="Bella Service"
-        width={1024}
-        height={1024}
         priority
         className="mx-auto mb-7 h-auto w-full max-w-[224px] rounded-2xl"
       />

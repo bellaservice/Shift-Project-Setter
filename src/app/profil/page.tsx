@@ -1,4 +1,8 @@
 import Image from "next/image";
+/* Importerad, inte `src="/bella-logo.png"`: pa GitHub Pages ligger sajten under
+   /Shift-Project-Setter/, och en `/`-strang pekar forbi det prefixet. Se
+   AuthGate, dar samma sak slog ut loggan pa inloggningsskarmen. */
+import logo from "../../../public/bella-logo.png";
 import { Panel, DataRow } from "@/components/Panel";
 import { Screen } from "@/components/Screen";
 import { COMPANY } from "@/lib/company";
@@ -36,10 +40,8 @@ export default function ProfilPage() {
             appen som menar den faktiska fargen och inte "framgrundstonen". */}
         <span className="glass-flat flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#ffffff]/90">
           <Image
-            src="/bella-logo.png"
+            src={logo}
             alt=""
-            width={56}
-            height={56}
             className="h-12 w-12 object-contain"
           />
         </span>
