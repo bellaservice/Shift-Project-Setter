@@ -25,10 +25,9 @@ export function Query<T>({
   state: QueryState<T>;
   children: (data: T) => React.ReactNode;
 }) {
-  // Order matters: a reload keeps the previous `data` on screen and only the
-  // first load has none, so asking for `data` before asking for `loading` is
-  // what stops a refresh after saving from blanking the list and snapping it
-  // back. A screen that has ever had rows never goes empty again.
+  // `data` first, and `error` only after it. A screen that has an answer shows
+  // the answer; the other two branches are both "no answer yet", and which of
+  // them is drawn is the difference between a wait and a dead end.
   if (state.data !== undefined) return <>{children(state.data)}</>;
 
   if (state.error !== null) {

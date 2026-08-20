@@ -30,5 +30,8 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  // supabase/functions ar Deno, inte Node: de importerar fran jsr:, kor mot
+  // Deno.serve och har inga av de har typerna. Next skulle annars typkolla dem
+  // som om de vore appkod och fela pa varenda rad.
+  "exclude": ["node_modules", "supabase/functions"]
 }

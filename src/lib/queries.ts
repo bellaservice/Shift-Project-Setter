@@ -709,8 +709,11 @@ export async function getTrashedWorkerIds(): Promise<string[]> {
 export async function getKonton(): Promise<KontoItem[]> {
   const { data, error } = await supabase
     .from("accounts")
+    // `workers(...)` och inte `workers!inner(...)`: ett konto utan arbetare har
+    // ingen rad att joina mot, och ett inner join hade tystat bort det ur
+    // listan i stallet for att visa det.
     .select(
-      "id, worker_id, status, created_at, workers!inner(name, email, profile_picture_url)"
+      "id, worker_id, status, created_at, email, workers(name, email, profile_picture_url)"
     )
     .order("created_at", { ascending: true });
 
@@ -719,19 +722,26 @@ export async function getKonton(): Promise<KontoItem[]> {
   }
 
   return (data ?? []).map((a) => {
-    // PostgREST typar en inbaddad tabell som array; !inner ger alltid exakt en.
-    const w = (Array.isArray(a.workers) ? a.workers[0] : a.workers) as {
-      name: string;
-      email: string | null;
-      profile_picture_url: string | null;
-    };
+    // PostgREST typar en inbaddad tabell som array. Utan !inner kan den ocksa
+    // vara tom eller null — det ar precis fallet "konto utan arbetare".
+    const w = (Array.isArray(a.workers) ? a.workers[0] : a.workers) as
+      | { name: string; email: string | null; profile_picture_url: string | null }
+      | null
+      | undefined;
+
+    const kopplad = w != null;
+    const epost = kopplad ? w.email ?? "" : String(a.email ?? "");
+
     return {
       id: a.id as string,
-      workerId: a.worker_id as string,
-      namn: w.name,
-      epost: w.email ?? "",
-      bild: w.profile_picture_url,
+      workerId: (a.worker_id as string | null) ?? null,
+      // Ett konto utan arbetare heter sin adress. Det ar inte ett fint namn,
+      // men det ar det enda sanna: det finns ingen person i appen att namnge.
+      namn: kopplad ? w.name : epost,
+      epost,
+      bild: kopplad ? w.profile_picture_url : null,
       status: a.status as KontoStatus,
+      kopplad,
       skapad: String(a.created_at).slice(0, 10),
     };
   });
@@ -740,7 +750,7 @@ export async function getKonton(): Promise<KontoItem[]> {
 /**
  * Arbetarna som gar att tillverka ett konto at.
  *
- * Tva villkor, och bada ar samma villkor som databasen sjalv haller pa
+ * Ett villkor, och det ar samma villkor som databasen sjalv haller pa
  * (accounts_require_worker_email och unique(worker_id)): arbetaren maste ha en
  * e-post, for det ar den man loggar in med, och far inte redan ha ett konto.
  * Att filtrera har ar inte valideringen — det ar att slippa erbjuda ett val som
@@ -752,7 +762,6 @@ export async function getKontoKandidater(): Promise<KontoKandidat[]> {
       .from("workers")
       .select("id, name, email")
       .is("deleted_at", null)
-      .not("email", "is", null)
       .order("name", { ascending: true }),
     supabase.from("accounts").select("worker_id"),
   ]);
@@ -764,7 +773,14 @@ export async function getKontoKandidater(): Promise<KontoKandidat[]> {
 
   const upptagna = new Set((accountsResult.data ?? []).map((a) => a.worker_id));
 
+  // Bara ett villkor kvar: arbetaren far inte redan ha ett konto. Att sakna
+  // e-post diskvalificerar henne inte langre — adressen fylls i formularet och
+  // sparas pa arbetaren nar kontot tillverkas.
   return (workersResult.data ?? [])
-    .filter((w) => !upptagna.has(w.id) && String(w.email ?? "").trim() !== "")
-    .map((w) => ({ id: w.id, namn: w.name, epost: String(w.email).trim() }));
+    .filter((w) => !upptagna.has(w.id))
+    .map((w) => ({
+      id: w.id,
+      namn: w.name,
+      epost: String(w.email ?? "").trim() || null,
+    }));
 }

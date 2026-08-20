@@ -208,26 +208,43 @@ export type KontoStatus = "aktiv" | "pausad" | "avstangd";
 /**
  * En rad i kontolistan: inloggningen och personen den ar, i ett.
  *
- * `namn`, `epost` och `bild` kommer ur arbetaren och inte ur kontot — kontot
- * ager bara kopplingen och statusen. Byter arbetaren namn eller bild byter
- * raden med, av sig sjalv.
+ * For ett arbetarkonto kommer `namn`, `epost` och `bild` ur arbetaren och inte
+ * ur kontot — kontot ager bara kopplingen och statusen. Byter arbetaren namn
+ * eller bild byter raden med, av sig sjalv.
+ *
+ * For ett konto utan arbetare finns ingen sadan rad att hamta ur. Da star
+ * adressen i accounts.email och `namn` ar adressen, eftersom det ar det enda
+ * kontot heter. `kopplad` sager vilket av de tva en rad ar, sa att listan slipper
+ * gissa pa om `workerId` rakar vara null.
  */
 export type KontoItem = {
   /** Kontots id, som ocksa ar auth-anvandarens. */
   id: string;
-  workerId: string;
+  /** Arbetaren kontot ar, eller null for ett konto utan arbetare. */
+  workerId: string | null;
   namn: string;
-  /** Arbetarens e-post — adressen kontot loggar in med. */
+  /** Adressen kontot loggar in med — ur arbetaren, eller ur kontot sjalvt. */
   epost: string;
   bild: string | null;
   status: KontoStatus;
+  /** Om kontot hor till en arbetare i rostern. */
+  kopplad: boolean;
   /** ISO-datum. Bara radens undertext; ingen logik hanger pa den. */
   skapad: string;
 };
 
-/** En arbetare som kan fa ett konto: har e-post och har inget konto redan. */
+/**
+ * En arbetare som kan fa ett konto: har inget konto redan.
+ *
+ * `epost` far vara null. Kravet att adressen finns star kvar — den ar
+ * inloggningen — men det ar ett krav pa kontot, inte pa arbetaren, och det gar
+ * att uppfylla pa stallet: formularet later anvandaren skriva in adressen, och
+ * den sparas pa arbetaren nar kontot tillverkas. Att gomma arbetaren ur listan
+ * i stallet vore att svara "hon finns inte" pa fragan "varfor kan jag inte ge
+ * henne ett konto".
+ */
 export type KontoKandidat = {
   id: string;
   namn: string;
-  epost: string;
+  epost: string | null;
 };

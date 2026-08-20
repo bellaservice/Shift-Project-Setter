@@ -117,7 +117,7 @@ function RedigeraProject() {
                   id={data.project.id}
                   label="Ta Bort Project"
                   title={`Ta bort ${projectLabel(data.project)}?`}
-                  description={`Projectet flyttas till Papperskorgen med sina tjanster, kopplade arbetare och alla pass som loggats pa det, och timmarna forsvinner samtidigt ur totalerna pa Hem. Du har ${TRASH_RETENTION_DAYS} dagar pa dig att hamta tillbaka det darifran — darefter raderas allt permanent.`}
+                  description={`Projectet flyttas till Papperskorgen med sina tjänster, kopplade arbetare och alla pass som loggats på det, och timmarna försvinner samtidigt ur totalerna på Hem. Du har ${TRASH_RETENTION_DAYS} dagar på dig att hämta tillbaka det därifrån — därefter raderas allt permanent.`}
                   confirmLabel="Ja, ta bort projectet"
                   pendingLabel="Tar bort…"
                 />

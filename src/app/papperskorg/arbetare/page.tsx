@@ -110,7 +110,7 @@ function PapperskorgArbetare() {
                   id={data.id}
                   label="Radera Permanent Nu"
                   title={`Radera ${data.name} permanent?`}
-                  description="Arbetaren raderas ur databasen direkt i stallet for nar fristen gar ut, tillsammans med alla pass som loggats pa hen och med profilbilden. Timmarna forsvinner darmed ocksa fran projectens summor. Det gar inte att angra."
+                  description="Arbetaren raderas ur databasen direkt i stället för när fristen går ut, tillsammans med alla pass som loggats på hen och med profilbilden. Timmarna försvinner därmed också från projectens summor. Det går inte att ångra."
                   confirmLabel="Ja, radera permanent"
                 />
               </div>

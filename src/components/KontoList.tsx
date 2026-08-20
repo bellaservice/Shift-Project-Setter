@@ -23,36 +23,30 @@ import type { KontoItem } from "@/lib/types";
  * det ar den inte langre.
  */
 export function KontoList({ konton }: { konton: KontoItem[] }) {
-  return (
-    <>
-      <p className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-[13px] leading-relaxed text-white/65">
-        Konton visas har men hanteras i Supabase under{" "}
-        <span className="font-semibold text-white/80">
-          Authentication &gt; Users
-        </span>
-        . Appen kor utan server och kan darfor inte skapa, ta bort eller sparra
-        inloggningar.
-      </p>
+  if (konton.length === 0) {
+    return (
+      <EmptyState
+        title="Inga konton än."
+        hint="Ett konto är en arbetares inloggning i appen."
+      />
+    );
+  }
 
-      {konton.length === 0 ? (
-        <EmptyState
-          title="Inga konton än."
-          hint="Ett konto är en arbetares inloggning i appen."
-        />
-      ) : (
-        <div className="glass rounded-2xl">
-          <div className="divide-y divide-night-line">
-            {konton.map((konto) => (
-              <KontoRad key={konto.id} konto={konto} />
-            ))}
-          </div>
-        </div>
-      )}
-    </>
+  return (
+    <div className="glass rounded-2xl">
+      <div className="divide-y divide-night-line">
+        {konton.map((konto) => (
+          <KontoRad key={konto.id} konto={konto} />
+        ))}
+      </div>
+    </div>
   );
 }
 
 function KontoRad({ konto }: { konto: KontoItem }) {
+  // Ett konto utan arbetare heter sin adress, sa att upprepa adressen pa
+  // underraden vore att skriva samma sak tva ganger. Underraden sager i stallet
+  // vad raden ar, vilket ar den enda uppgift som skiljer den fran de andra.
   const status =
     KONTO_STATUS.find((s) => s.value === konto.status)?.label ?? konto.status;
 
@@ -64,7 +58,9 @@ function KontoRad({ konto }: { konto: KontoItem }) {
         <div className="truncate text-[15px] font-bold text-white">
           {konto.namn}
         </div>
-        <div className="truncate text-xs text-white/60">{konto.epost}</div>
+        <div className="truncate text-xs text-white/60">
+          {konto.kopplad ? konto.epost : "Utan arbetare"}
+        </div>
       </div>
 
       <StatusBricka status={status} aktiv={konto.status === "aktiv"} />

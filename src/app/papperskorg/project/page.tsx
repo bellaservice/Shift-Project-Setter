@@ -113,7 +113,7 @@ function PapperskorgProject() {
                   id={data.project.id}
                   label="Radera Permanent Nu"
                   title={`Radera ${projectLabel(data.project)} permanent?`}
-                  description="Projectet raderas ur databasen direkt i stallet for nar fristen gar ut, tillsammans med sina tjanster, kopplade arbetare och alla pass som loggats pa det. Timmarna forsvinner darmed ocksa fran totalerna pa Hem. Det gar inte att angra."
+                  description="Projectet raderas ur databasen direkt i stället för när fristen går ut, tillsammans med sina tjänster, kopplade arbetare och alla pass som loggats på det. Timmarna försvinner därmed också från totalerna på Hem. Det går inte att ångra."
                   confirmLabel="Ja, radera permanent"
                 />
               </div>

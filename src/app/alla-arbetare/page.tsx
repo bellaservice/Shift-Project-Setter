@@ -1,7 +1,6 @@
 "use client";
 
 import { ActionRow, PanelList, RowLink, RowMeta } from "@/components/Panel";
-import { ButtonLink } from "@/components/Button";
 import { Query } from "@/components/Query";
 import { CountBadge, EmptyState, Screen } from "@/components/Screen";
 import { formatHoursSv } from "@/lib/format";
@@ -69,12 +68,7 @@ export default function AllaArbetarePage() {
           workers.length === 0 ? (
             <EmptyState
               title="Inga arbetare registrerade än."
-              hint="Lägg till den första — sedan kan pass loggas på hen."
-              action={
-                <ButtonLink href="/ny-arbetare" size="md">
-                  Lägg Till Arbetare
-                </ButtonLink>
-              }
+              hint="Lägg till den första."
             />
           ) : (
             <PanelList>

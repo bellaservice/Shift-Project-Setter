@@ -40,7 +40,7 @@ export function ProjectMonthList({ groups }: { groups: ProjectMonthGroup[] }) {
     return (
       <EmptyState
         title="Inga project loggade än."
-        hint="Lägg upp det första med Logga Project — sedan kan timmar loggas på det."
+        hint="Lägg upp det första med Logga Project."
       />
     );
   }

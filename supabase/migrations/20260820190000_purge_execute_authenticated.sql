@@ -1,0 +1,56 @@
+-- Let the signed-in browser call the papperskorg purge.
+--
+-- What broke
+-- ----------
+-- Opening Papperskorgen failed with
+--
+--     permission denied for function purge_expired_trash
+--
+-- which is the app's only RPC, and the first thing that page does before it
+-- reads the list — so the screen never got as far as showing anything.
+--
+-- 20260820180000 moved every table and the profile-pictures bucket from the
+-- service role over to `authenticated`, because the static export has no server
+-- and the browser is the only caller left. It did not move this function. The
+-- grant was still the v1 one from 20260819160000:
+--
+--     revoke all on function public.purge_expired_trash() from public, anon, authenticated;
+--     grant execute on function public.purge_expired_trash() to service_role;
+--
+-- and there is no service role in a browser.
+--
+-- Why the SECURITY DEFINER note on the page did not cover this
+-- -----------------------------------------------------------
+-- papperskorg/page.tsx reasons that the call is safe to move into the browser
+-- because `purge_expired_trash` is SECURITY DEFINER, "sa vad den far gora
+-- bestams av funktionen och inte av vem som ringer den". That is true and it is
+-- still true — but it is about what the function may do once it is *running*.
+-- Starting it is a separate privilege, EXECUTE, and that one was never granted.
+-- Nor do the new RLS policies reach it: a function grant is not a table policy,
+-- which is why adding six policies fixed the tables and left this untouched.
+--
+-- Why `authenticated`, and why this is not a widening
+-- ---------------------------------------------------
+-- The function deletes only rows whose deleted_at is already older than three
+-- weeks, it is idempotent, and it holds an advisory lock shared with the cron
+-- job. Meanwhile 20260820180000 granted `authenticated` `for all` on workers and
+-- projects, so a signed-in user can hard-delete any row in either table
+-- directly. This grant therefore adds no capability that is not already there;
+-- it restores the one the app is built on.
+--
+-- `anon` is named by nothing here, exactly as 20260820180000 requires. A visitor
+-- who loads the site and never logs in cannot run the purge, just as they cannot
+-- read a row.
+--
+-- kit.purge_expired_trash() is deliberately NOT touched. It stays owner-only
+-- (`postgres=X/postgres`); the public wrapper is SECURITY DEFINER and owned by
+-- postgres, so it reaches the inner function as its owner rather than as the
+-- caller. That is the whole point of the two-function shape.
+--
+-- public.deactivate_stale_projects() keeps its service_role-only grant on
+-- purpose: nothing in the app calls it, only the nightly cron job does.
+
+grant execute on function public.purge_expired_trash() to authenticated;
+
+comment on function public.purge_expired_trash() is
+    'PostgREST-anropbar wrapper runt kit.purge_expired_trash(). Kors av den inloggade anvandaren nar Papperskorgen oppnas, och nattligt av cron-jobbet. Aldrig av anon.';

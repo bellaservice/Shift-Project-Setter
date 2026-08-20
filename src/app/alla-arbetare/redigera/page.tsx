@@ -97,7 +97,7 @@ function RedigeraArbetare() {
                   id={data.id}
                   label="Ta Bort Arbetare"
                   title={`Ta bort ${data.name}?`}
-                  description={`Arbetaren flyttas till Papperskorgen med alla sina uppgifter, och passen som loggats pa hen forsvinner samtidigt ur projectens summor. Du har ${TRASH_RETENTION_DAYS} dagar pa dig att hamta tillbaka hen darifran — darefter raderas allt permanent.`}
+                  description={`Arbetaren flyttas till Papperskorgen med alla sina uppgifter, och passen som loggats på hen försvinner samtidigt ur projectens summor. Du har ${TRASH_RETENTION_DAYS} dagar på dig att hämta tillbaka hen därifrån — därefter raderas allt permanent.`}
                   confirmLabel="Ja, ta bort arbetaren"
                   pendingLabel="Tar bort…"
                 />
