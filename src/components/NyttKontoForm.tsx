@@ -1,19 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/Button";
-import { Field, FieldHint, FieldLabel } from "@/components/Field";
+import { skapaKonto } from "@/app/installningar/konto/actions";
+import { Button, ButtonLink } from "@/components/Button";
+import { FieldHint, FieldLabel } from "@/components/Field";
+import { Dropdown } from "@/components/Dropdown";
 import { Check, Copy, Eye, EyeOff } from "@/components/Icons";
 import { FormSection } from "@/components/Panel";
-import { ProfilePictureInput } from "@/components/ProfilePictureInput";
-import {
-  addKonto,
-  epostFinns,
-  inloggningsText,
-  skrivTillUrklipp,
-  toAvatarDataUrl,
-} from "@/lib/konton";
+import { EmptyState } from "@/components/Screen";
+import { inloggningsText, skrivTillUrklipp } from "@/lib/konton";
+import type { KontoKandidat } from "@/lib/types";
 
 /** Kortare an sa ar det inte ett losenord, det ar en gissning. */
 const MIN_LANGD = 8;
@@ -21,12 +17,22 @@ const MIN_LANGD = 8;
 /**
  * Att tillverka ett konto at nagon annan.
  *
- * Ordningen pa sidan ar ordningen handlingen faktiskt har: fyll i vem det ar,
- * bestam ett losenord, KOPIERA uppgifterna, och skapa sedan kontot. Kopieringen
- * ligger fore knappen som skapar och inte efter, och det ar hela poangen med
- * placeringen: losenordet finns bara sa lange det star i rutan (se
- * lib/konton.ts — det sparas aldrig), sa den som skapar forst och tanker pa att
- * skicka uppgifterna efterat star med ett konto ingen kan logga in i.
+ * Kontot ar INTE en ny person. Man valjer en arbetare som redan finns, och det
+ * ar det valet som gor att appen vet vem inloggningen ar: passen, timmarna och
+ * Arbetsdagbockerna hanger alla pa arbetaren, och ett konto utan den kopplingen
+ * vore en e-postadress utan agare.
+ *
+ * Darfor finns det inget e-postfalt heller. Adressen ar arbetarens egen, den ur
+ * hennes profil, och den visas har som en uppgift och inte som ett falt — den
+ * andras i Redigera Arbetare, dar den bor, och foljer da med inloggningen.
+ *
+ * Ordningen pa sidan ar ordningen handlingen faktiskt har: vem det ar, ett
+ * losenord, KOPIERA uppgifterna, och skapa sedan kontot. Kopieringen ligger
+ * fore knappen som skapar och inte efter, och det ar hela poangen med
+ * placeringen: losenordet finns bara sa lange det star i rutan — efterat ligger
+ * det som en hash hos Supabase Auth och gar inte att lasa ut — sa den som
+ * skapar forst och tanker pa att skicka uppgifterna efterat star med ett konto
+ * ingen kan logga in i.
  *
  * Formatet pa det som kopieras ar mottagarens, inte appens:
  *
@@ -35,23 +41,19 @@ const MIN_LANGD = 8;
  *
  * — tva rader att klistra in i ett meddelande, ingenting daromkring.
  */
-export function NyttKontoForm() {
-  const router = useRouter();
-
-  const [namn, setNamn] = useState("");
-  const [epost, setEpost] = useState("");
+export function NyttKontoForm({ kandidater }: { kandidater: KontoKandidat[] }) {
+  const [workerId, setWorkerId] = useState("");
   const [losenord, setLosenord] = useState("");
   const [upprepa, setUpprepa] = useState("");
-  const [bild, setBild] = useState<string | null>(null);
   /** null = inte forsokt an. Aterstalls sa fort nagot av det kopierade andras,
    *  annars star kvittot kvar och pastar att ett gammalt losenord ligger i
    *  urklipp. */
   const [kopierat, setKopierat] = useState<"ja" | "nej" | null>(null);
 
+  const vald = kandidater.find((k) => k.id === workerId);
   const langdOk = losenord.length >= MIN_LANGD;
   const lika = losenord !== "" && losenord === upprepa;
-  const epostOk = epost.trim() !== "" && !epostFinns(epost);
-  const kanKopiera = epostOk && langdOk && lika;
+  const kanKopiera = vald !== undefined && langdOk && lika;
 
   function andra(satt: (v: string) => void) {
     return (value: string) => {
@@ -61,61 +63,83 @@ export function NyttKontoForm() {
   }
 
   async function kopiera() {
-    const gick = await skrivTillUrklipp(inloggningsText(epost.trim(), losenord));
+    if (!vald) return;
+    const gick = await skrivTillUrklipp(inloggningsText(vald.epost, losenord));
     // Nekades urklippet visas raderna i klartext i stallet, sa att de gar att
     // markera for hand. Se `skrivTillUrklipp` for nar det hander.
     setKopierat(gick ? "ja" : "nej");
   }
 
-  function skapa(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!kanKopiera) return;
-
-    addKonto({
-      namn: namn.trim(),
-      epost: epost.trim(),
-      status: "aktiv",
-      bild,
-    });
-    router.push("/installningar/konto");
+  // Ingen att ge ett konto: antingen har alla arbetare redan ett, eller sa
+  // saknar de e-post. Bada lagas pa samma stalle, sa skarmen pekar dit i
+  // stallet for att visa ett formular med en tom lista i.
+  if (kandidater.length === 0) {
+    return (
+      <EmptyState
+        title="Ingen arbetare att ge ett konto."
+        hint="Konton görs åt arbetare som finns i appen och har en e-postadress i sin profil — adressen är den man loggar in med."
+        action={
+          <ButtonLink href="/alla-arbetare" variant="secondary">
+            Alla Arbetare
+          </ButtonLink>
+        }
+      />
+    );
   }
 
   return (
-    <form onSubmit={skapa} className="flex flex-col gap-3.5">
-      <FormSection title="Kontot">
-        <ProfilePictureInput
-          onPick={async (file) => {
-            setBild(file ? await toAvatarDataUrl(file) : null);
-          }}
-        />
-        <Field
-          label="Namn"
-          name="namn"
-          required
-          onValueChange={andra(setNamn)}
-        />
-        <Field
-          label="E-post"
-          name="epost"
-          type="email"
-          required
-          placeholder="namn@bellaservice.se"
-          onValueChange={andra(setEpost)}
-          validationMessage={
-            epost.trim() !== "" && epostFinns(epost)
-              ? "Det finns redan ett konto med den e-postadressen."
-              : undefined
-          }
-          hint="Det är den här adressen man loggar in med."
-        />
+    <form action={skapaKonto} className="flex flex-col gap-3.5">
+      <FormSection
+        title="Vem"
+        hint="Kontot blir den här arbetarens inloggning, så appen vet vems passen och timmarna är."
+      >
+        <div>
+          <FieldLabel>
+            Arbetare
+            <span aria-hidden className="ml-1 text-night-accent">
+              *
+            </span>
+          </FieldLabel>
+          <Dropdown
+            name="worker_id"
+            required
+            value={workerId}
+            onChange={andra(setWorkerId)}
+            options={kandidater.map((k) => ({ value: k.id, label: k.namn }))}
+            placeholder="Välj arbetare"
+            ariaLabel="Arbetare"
+            emptyMessage="Ingen arbetare utan konto."
+          />
+        </div>
+
+        {/* E-posten som en uppgift och inte som ett falt: den ar redan bestamd,
+            den star i arbetarens profil, och tva rutor som ska innehalla samma
+            adress ar tva rutor som forr eller senare gor det. */}
+        <div>
+          <FieldLabel>E-post</FieldLabel>
+          <div className="glass-flat flex min-h-12 items-center rounded-xl px-3.5">
+            <span
+              className={`truncate text-base ${
+                vald ? "text-white" : "text-white/40"
+              }`}
+            >
+              {vald ? vald.epost : "Väljs med arbetaren"}
+            </span>
+          </div>
+          <FieldHint>
+            Arbetarens egen adress — den man loggar in med. Ändras i Redigera
+            Arbetare.
+          </FieldHint>
+        </div>
       </FormSection>
 
       <FormSection
         title="Lösenord"
-        hint="Skrivs två gånger för att ett skrivfel inte ska bli ett konto ingen kommer in i. Lösenordet sparas inte i appen — det lämnar den här sidan bara via knappen nedan."
+        hint="Skrivs två gånger för att ett skrivfel inte ska bli ett konto ingen kommer in i. Efter att kontot skapats går lösenordet inte att läsa ut igen."
       >
         <PasswordField
           label="Lösenord"
+          name="losenord"
           value={losenord}
           onChange={andra(setLosenord)}
           autoComplete="new-password"
@@ -127,6 +151,7 @@ export function NyttKontoForm() {
         />
         <PasswordField
           label="Upprepa Lösenord"
+          name="upprepa"
           value={upprepa}
           onChange={andra(setUpprepa)}
           autoComplete="new-password"
@@ -151,11 +176,11 @@ export function NyttKontoForm() {
         {kopierat === "ja" ? "Kopierat" : "Kopiera Inloggningsuppgifter"}
       </Button>
 
-      {kopierat === "nej" && (
+      {kopierat === "nej" && vald && (
         <div className="glass-flat rounded-xl p-3">
           <FieldLabel>Kopiera för hand</FieldLabel>
           <pre className="overflow-x-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-white/85 select-all">
-            {inloggningsText(epost.trim(), losenord)}
+            {inloggningsText(vald.epost, losenord)}
           </pre>
           <FieldHint tone="warn">
             Webbläsaren nekade appen tillgång till urklipp.
@@ -165,7 +190,7 @@ export function NyttKontoForm() {
 
       {!kanKopiera && (
         <FieldHint>
-          Knappen tänds när e-posten är ifylld och de två lösenorden är lika.
+          Knappen tänds när en arbetare är vald och de två lösenorden är lika.
         </FieldHint>
       )}
 
@@ -190,12 +215,14 @@ export function NyttKontoForm() {
  */
 function PasswordField({
   label,
+  name,
   value,
   onChange,
   autoComplete,
   problem,
 }: {
   label: string;
+  name: string;
   value: string;
   onChange: (value: string) => void;
   autoComplete: string;
@@ -221,6 +248,7 @@ function PasswordField({
       <div className="glass-field flex h-12 items-center rounded-xl pl-3.5">
         <input
           ref={inputRef}
+          name={name}
           type={synligt ? "text" : "password"}
           required
           value={value}

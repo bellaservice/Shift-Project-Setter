@@ -1,5 +1,8 @@
 import { NyttKontoForm } from "@/components/NyttKontoForm";
 import { Screen } from "@/components/Screen";
+import { getKontoKandidater } from "@/lib/queries";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Tillverka Konto — Bella Service" };
 
@@ -8,7 +11,9 @@ export const metadata = { title: "Tillverka Konto — Bella Service" };
  * ifran. Det har ar en skarm dar nagot skapas — samma sort som Logga Project
  * och Ny Arbetare — och den ska kannas som dem.
  */
-export default function NyttKontoPage() {
+export default async function NyttKontoPage() {
+  const kandidater = await getKontoKandidater();
+
   return (
     <Screen
       tone="amber"
@@ -16,7 +21,7 @@ export default function NyttKontoPage() {
       title="Tillverka Konto"
       back={{ href: "/installningar/konto", label: "Konto" }}
     >
-      <NyttKontoForm />
+      <NyttKontoForm kandidater={kandidater} />
     </Screen>
   );
 }
