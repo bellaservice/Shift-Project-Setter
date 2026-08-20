@@ -17,6 +17,7 @@ import {
   subscribeProjectDraft,
   type ProjectFormValues,
 } from "@/lib/projectDraft";
+import { useNavigatingAction } from "@/lib/useNavigatingAction";
 import type { ProjectWithDetails, Worker } from "@/lib/types";
 import { saveProject } from "./actions";
 
@@ -134,9 +135,11 @@ function ProjectFields({
     router.push(`/ny-arbetare?next=${encodeURIComponent(path)}`);
   }
 
+  const submit = useNavigatingAction(saveProject);
+
   return (
     <form
-      action={saveProject}
+      action={submit}
       // Formuläret är inskickat: utkastet har gjort sitt och ska inte dyka upp
       // igen nästa gång sidan öppnas.
       onSubmit={() => clearProjectDraft(path)}

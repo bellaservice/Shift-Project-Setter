@@ -7,6 +7,7 @@ import { FormSection } from "@/components/Panel";
 import { PassFields, usePassFields } from "@/components/PassFields";
 import { WorkerRows } from "@/components/WorkerRows";
 import { projectLabel } from "@/lib/format";
+import { useNavigatingAction } from "@/lib/useNavigatingAction";
 import type { Project, Worker } from "@/lib/types";
 import { logShifts } from "./actions";
 import { LoggaTimmarProjectSelect } from "./LoggaTimmarProjectSelect";
@@ -28,9 +29,10 @@ export function LoggaTimmarForm({
   // Passets langd bors har och inte i <PassFields>: timmarna som skrivs hogst
   // upp i formularet ar samma timmar som ekas bredvid arbetarna langst ner.
   const pass = usePassFields();
+  const submit = useNavigatingAction(logShifts);
 
   return (
-    <form action={logShifts} className="flex flex-col gap-3.5">
+    <form action={submit} className="flex flex-col gap-3.5">
       <FormSection title="Passet">
         <PassFields {...pass} />
       </FormSection>

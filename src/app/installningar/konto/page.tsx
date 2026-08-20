@@ -1,18 +1,22 @@
-import { KontoList } from "@/components/KontoList";
 import { Screen } from "@/components/Screen";
+import { KontoLista } from "./KontoLista";
 
 export const metadata = { title: "Konto — Bella Service" };
 
 /**
- * Vilka som ska kunna logga in, och vad de har for status.
+ * Vilka som kan logga in, och vad de har for status.
  *
- * Skarmen ar byggd fore inloggningen sjalv och sager det rakt ut i stallet for
- * att se ut som ett register den inte ar an — se lib/konton.ts for vad som
- * ligger var. Allt annat pa sidan ar riktigt: raderna, statusen, raderingen och
- * formularet bakom knappen ar de som blir kvar nar kontona far en databas.
+ * Ett konto ar en arbetares inloggning: raden visar hennes namn, hennes bild
+ * och den e-post som star i hennes profil, for det ar den man loggar in med.
+ * Se supabase/migrations/20260820120000_konton.sql for kopplingen.
  *
- * `steel` som resten av rummet bakom kugghjulet. Den enda skarmen harifran som
- * byter ton ar den som SKAPAR nagot — se Tillverka Konto.
+ * `steel` som resten av rummet bakom kugghjulet. Skarmen som SKAPADE konton ar
+ * borta -- den gick genom Supabases admin-API, som bara svarar pa service
+ * role-nyckeln, och den nyckeln kan inte finnas i en webblasare. Se KontoList.
+ *
+ * Sidan ar fortfarande en serverkomponent, och det ar avsiktligt: den hamtar
+ * ingenting sjalv, sa den kan skrivas ut till en fil vid bygget, och da far den
+ * behalla sin `metadata`. Lasningen ligger i <KontoLista>.
  */
 export default function KontoPage() {
   return (
@@ -22,13 +26,7 @@ export default function KontoPage() {
       title="Konto"
       back={{ href: "/installningar", label: "Inställningar" }}
     >
-      <p className="-mt-1 px-1 text-xs leading-relaxed text-white/65">
-        Kontona som ska kunna logga in i appen. Inloggningen är inte påkopplad
-        än — tills den är det ligger listan i den här webbläsaren, och lösenord
-        sparas aldrig i appen.
-      </p>
-
-      <KontoList />
+      <KontoLista />
     </Screen>
   );
 }

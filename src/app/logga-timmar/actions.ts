@@ -1,8 +1,5 @@
-"use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabase } from "@/lib/supabase/browser";
 import { requiredString } from "@/lib/formData";
 
 /**
@@ -48,7 +45,7 @@ export async function logShifts(formData: FormData) {
   ];
   if (workerIds.length === 0) throw new Error("Valj minst en arbetare");
 
-  const { error } = await supabaseAdmin.from("shifts").insert(
+  const { error } = await supabase.from("shifts").insert(
     workerIds.map((worker_id) => ({
       project_id: projectId,
       worker_id,
@@ -60,12 +57,6 @@ export async function logShifts(formData: FormData) {
   );
   if (error) throw new Error(`Kunde inte spara pass: ${error.message}`);
 
-  revalidatePath("/");
-  revalidatePath("/alla-project");
-  revalidatePath("/alla-arbetare");
-  revalidatePath(`/logga-project/${projectId}`);
-  revalidatePath("/logga-timmar");
   // Nya pass ar nya rader i arbetsdagbokens dagtabeller.
-  revalidatePath(`/alla-project/${projectId}/arbetsdagbok`);
-  redirect("/");
+  return "/";
 }

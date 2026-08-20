@@ -6,6 +6,7 @@ import { EmergencyContactFields } from "@/components/EmergencyContactFields";
 import { Field } from "@/components/Field";
 import { FormSection } from "@/components/Panel";
 import { ProfilePictureInput } from "@/components/ProfilePictureInput";
+import { useNavigatingAction } from "@/lib/useNavigatingAction";
 import type { Worker } from "@/lib/types";
 
 /**
@@ -30,8 +31,12 @@ export function ArbetareForm({
    *  Project. Utan den lamnar sparandet till Hem eller arbetarlistan. */
   next?: string;
 }) {
+  // saveWorker svarar numera med vagen framat i stallet for att kalla pa
+  // redirect(), som inte finns i en handelsehanterare. Se useNavigatingAction.
+  const submit = useNavigatingAction(saveWorker);
+
   return (
-    <form action={saveWorker} className="flex flex-col gap-3.5">
+    <form action={submit} className="flex flex-col gap-3.5">
       {worker && <input type="hidden" name="id" value={worker.id} />}
       {next && <input type="hidden" name="next" value={next} />}
 

@@ -1,8 +1,5 @@
-"use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabase } from "@/lib/supabase/browser";
 import { optionalString, requiredString } from "@/lib/formData";
 import { passSpanHours } from "@/lib/format";
 
@@ -54,7 +51,7 @@ async function savePassCorrections(formData: FormData) {
     // Alla arbetare pa passet loggades med samma tider och samma timmar, och
     // rattas darfor tillsammans -- annars skulle en av raderna sta kvar med det
     // gamla spannet i samma dagtabell.
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from("shifts")
       .update({ hours, start_time, end_time })
       .in("id", ids);
@@ -86,7 +83,7 @@ export async function saveArbetsdagbokDetaljer(formData: FormData) {
   }
 
   if (Object.keys(patch).length > 0) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from("projects")
       .update(patch)
       .eq("id", projectId);
@@ -99,7 +96,7 @@ export async function saveArbetsdagbokDetaljer(formData: FormData) {
   // en summa som ingen bett om hor inte hemma i ett arbetsintyg.
   const service_name = optionalString(formData.get("service_name"));
   if (service_name) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from("project_services")
       .insert({ project_id: projectId, service_name, price: null });
     if (error) {
@@ -109,11 +106,6 @@ export async function saveArbetsdagbokDetaljer(formData: FormData) {
 
   await savePassCorrections(formData);
 
-  revalidatePath("/");
-  revalidatePath("/alla-project");
-  revalidatePath("/alla-arbetare");
-  revalidatePath(`/logga-project/${projectId}`);
-  revalidatePath(`/alla-project/${projectId}/arbetsdagbok`);
 
-  redirect(`/alla-project/${projectId}/arbetsdagbok?fortsatt=1`);
+  return `/alla-project/arbetsdagbok?id=${projectId}&fortsatt=1`;
 }

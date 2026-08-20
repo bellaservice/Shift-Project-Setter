@@ -1,8 +1,5 @@
-"use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabase } from "@/lib/supabase/browser";
 import { optionalString, requiredString } from "@/lib/formData";
 import { getTrashedWorkerIds } from "@/lib/queries";
 
@@ -66,7 +63,7 @@ export async function saveProject(formData: FormData) {
   let projectId = id;
 
   if (projectId) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from("projects")
       .update({
         name,
@@ -92,7 +89,7 @@ export async function saveProject(formData: FormData) {
     // stod pa. Darfor ror omskrivningen bara de kopplingar formularet faktiskt
     // kunde ha visat.
     const trashedWorkerIds = await getTrashedWorkerIds();
-    let workerDelete = supabaseAdmin
+    let workerDelete = supabase
       .from("project_workers")
       .delete()
       .eq("project_id", projectId);
@@ -105,13 +102,13 @@ export async function saveProject(formData: FormData) {
     }
 
     const [{ error: delServicesError }, { error: delWorkersError }] = await Promise.all([
-      supabaseAdmin.from("project_services").delete().eq("project_id", projectId),
+      supabase.from("project_services").delete().eq("project_id", projectId),
       workerDelete,
     ]);
     if (delServicesError) throw new Error(delServicesError.message);
     if (delWorkersError) throw new Error(delWorkersError.message);
   } else {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from("projects")
       // status / activated_at / deactivated_at are NOT sent: they are derived by
       // the BEFORE INSERT trigger kit.projects_set_activation_defaults, which sets
@@ -133,27 +130,21 @@ export async function saveProject(formData: FormData) {
   }
 
   if (services.length > 0) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from("project_services")
       .insert(services.map((s) => ({ ...s, project_id: projectId })));
     if (error) throw new Error(`Kunde inte spara tjanster: ${error.message}`);
   }
 
   if (workerIds.length > 0) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from("project_workers")
       .insert(workerIds.map((worker_id) => ({ project_id: projectId, worker_id })));
     if (error) throw new Error(`Kunde inte spara arbetare: ${error.message}`);
   }
 
-  revalidatePath("/");
-  revalidatePath("/alla-project");
-  revalidatePath("/papperskorg");
-  revalidatePath(`/logga-project/${projectId}`);
-  revalidatePath(`/papperskorg/project/${projectId}`);
   // Arbetsdagboken laser bestallaruppgifterna och tjansterna som just andrades.
-  revalidatePath(`/alla-project/${projectId}/arbetsdagbok`);
-  redirect("/");
+  return "/";
 }
 
 /**
@@ -173,7 +164,7 @@ export async function saveProject(formData: FormData) {
 export async function deleteProject(formData: FormData) {
   const id = requiredString(formData.get("id"), "Project");
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("projects")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
@@ -184,9 +175,5 @@ export async function deleteProject(formData: FormData) {
     throw new Error(`Kunde inte ta bort project: ${error.message}`);
   }
 
-  revalidatePath("/");
-  revalidatePath("/alla-project");
-  revalidatePath("/alla-arbetare");
-  revalidatePath("/papperskorg");
-  redirect("/alla-project");
+  return "/alla-project";
 }

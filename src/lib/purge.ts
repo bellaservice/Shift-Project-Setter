@@ -1,5 +1,4 @@
-import "server-only";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabase } from "@/lib/supabase/browser";
 import { drainStoragePurgeQueue } from "@/lib/storage";
 
 /**
@@ -21,7 +20,7 @@ import { drainStoragePurgeQueue } from "@/lib/storage";
  * delete.
  */
 export async function purgeExpiredTrash(): Promise<void> {
-  const { error } = await supabaseAdmin.rpc("purge_expired_trash");
+  const { error } = await supabase.rpc("purge_expired_trash");
   if (error) {
     throw new Error(`Kunde inte tomma papperskorgen: ${error.message}`, {
       cause: error,

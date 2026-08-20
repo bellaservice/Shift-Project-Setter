@@ -52,7 +52,7 @@ grant usage on schema kit to postgres, authenticated, service_role;
 --    `status` ar appens ord, inte Supabase Auths. Auth kanner bara "bannad
 --    eller inte"; skarmen skiljer pa en som ar borta ett tag och en som ar
 --    borta for gott, och det ar den skillnaden som lagras har. Bada hindrar
---    inloggning -- se `banDuration` i installningar/konto/actions.ts.
+--    inloggning -- se `BAN_FOREVER` i src/lib/accounts.ts.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.accounts (
@@ -105,8 +105,10 @@ $fn$;
 comment on function kit.accounts_require_worker_email() is
     'Vaktar public.accounts: kontot maste peka pa en arbetare som har en e-postadress, eftersom adressen ar inloggningen.';
 
+-- service_role star kvar: appens serverkod skriver i tabellen, och en
+-- triggerfunktion den inte far kora vore en insert som inte gar igenom.
 revoke all on function kit.accounts_require_worker_email()
-    from public, anon, authenticated, service_role;
+    from public, anon, authenticated;
 
 drop trigger if exists accounts_require_worker_email on public.accounts;
 create trigger accounts_require_worker_email
@@ -144,7 +146,7 @@ comment on function kit.accounts_delete_auth_user() is
     'Raderar auth.users-raden nar kontot forsvinner, sa att en gallrad arbetare inte behaller en giltig inloggning.';
 
 revoke all on function kit.accounts_delete_auth_user()
-    from public, anon, authenticated, service_role;
+    from public, anon, authenticated;
 
 drop trigger if exists accounts_delete_auth_user on public.accounts;
 create trigger accounts_delete_auth_user

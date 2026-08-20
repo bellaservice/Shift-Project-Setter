@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { saveArbetsdagbokDetaljer } from "@/app/alla-project/[id]/arbetsdagbok/actions";
+import { saveArbetsdagbokDetaljer } from "@/app/alla-project/arbetsdagbok/actions";
 import { Button } from "@/components/Button";
 import { FIELD_BOX } from "@/components/Field";
 import {
   PassTiderRows,
   usePassProblemRows,
 } from "@/components/PassTiderRows";
+import { useNavigatingAction } from "@/lib/useNavigatingAction";
 import type { PassProblem } from "@/lib/types";
 
 /** En fråga i enkäten: vad som saknas, hur den frågas, och vilket fält svaret hamnar i. */
@@ -73,9 +74,11 @@ export function ArbetsdagbokSurvey({
     });
   }
 
+  const submit = useNavigatingAction(saveArbetsdagbokDetaljer);
+
   return (
     <div className="flex flex-col gap-4">
-      <form action={saveArbetsdagbokDetaljer} className="flex flex-col gap-3.5">
+      <form action={submit} className="flex flex-col gap-3.5">
         <input type="hidden" name="project_id" value={projectId} />
         <input type="hidden" name="pass_count" value={passProblems.length} />
 
@@ -160,7 +163,7 @@ export function ArbetsdagbokSurvey({
           enda vagen forbi en enkat som inte gar att svara pa, och den ska ga
           att traffa med tummen. Tyst yta, dock — den hoppar over ett steg. */}
       <Link
-        href={`/alla-project/${projectId}/arbetsdagbok?fortsatt=1`}
+        href={`/alla-project/arbetsdagbok?id=${projectId}&fortsatt=1`}
         className="flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold text-white/70 underline decoration-white/30 underline-offset-4 transition-colors duration-200 ease-out active:text-white motion-reduce:transition-none"
       >
         Generera utan dessa uppgifter

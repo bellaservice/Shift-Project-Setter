@@ -1,5 +1,4 @@
-import "server-only";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabase } from "@/lib/supabase/browser";
 import { formatPassTider, monthStartOf, passSpanHours } from "@/lib/format";
 import type {
   ArbetsdagbokData,
@@ -65,18 +64,18 @@ export async function getHomeStats(): Promise<HomeStats> {
     // count. Deleting used to cascade the pass away entirely, so the number
     // dropping is exactly what the user expects to see -- the difference is
     // that the row survives, and a restore brings the hours back with it.
-    supabaseAdmin
+    supabase
       .from("shifts")
       .select("hours, projects!inner(deleted_at), workers!inner(deleted_at)")
       .is("projects.deleted_at", null)
       .is("workers.deleted_at", null),
-    supabaseAdmin
+    supabase
       .from("projects")
       .select("*", { count: "exact", head: true })
       .eq("status", "active")
       .is("deleted_at", null),
     // Half-open range, so no special-casing for 28/29/30/31-day months.
-    supabaseAdmin
+    supabase
       .from("shifts")
       .select("*, projects!inner(deleted_at), workers!inner(deleted_at)", {
         count: "exact",
@@ -119,7 +118,7 @@ export async function getHomeStats(): Promise<HomeStats> {
  * decides.
  */
 export async function getOngoingProjects(): Promise<OngoingProject[]> {
-  const { data: projects, error: projectsError } = await supabaseAdmin
+  const { data: projects, error: projectsError } = await supabase
     .from("projects")
     .select("id, name, address")
     .eq("status", "active")
@@ -140,12 +139,12 @@ export async function getOngoingProjects(): Promise<OngoingProject[]> {
   if (projectIds.length === 0) return [];
 
   const [servicesResult, shiftsResult] = await Promise.all([
-    supabaseAdmin
+    supabase
       .from("project_services")
       .select("project_id, service_name")
       .in("project_id", projectIds)
       .order("service_name", { ascending: true }),
-    supabaseAdmin
+    supabase
       .from("shifts")
       .select("project_id, hours, workers!inner(deleted_at)")
       .in("project_id", projectIds)
@@ -186,7 +185,7 @@ export async function getOngoingProjects(): Promise<OngoingProject[]> {
 }
 
 export async function getWorkers(): Promise<Worker[]> {
-  const { data } = await supabaseAdmin
+  const { data } = await supabase
     .from("workers")
     .select("*")
     .is("deleted_at", null)
@@ -196,7 +195,7 @@ export async function getWorkers(): Promise<Worker[]> {
 
 /** One worker, for the Redigera Arbetare screen. Null when the id is unknown. */
 export async function getWorker(id: string): Promise<Worker | null> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("workers")
     .select("*")
     .eq("id", id)
@@ -215,7 +214,7 @@ export async function getWorker(id: string): Promise<Worker | null> {
 }
 
 export async function getProjects(): Promise<Project[]> {
-  const { data } = await supabaseAdmin
+  const { data } = await supabase
     .from("projects")
     .select("*")
     .is("deleted_at", null)
@@ -231,18 +230,18 @@ export async function getProjectWithDetails(
 ): Promise<ProjectWithDetails | null> {
   const [{ data: project }, { data: services }, { data: assignments }] =
     await Promise.all([
-      supabaseAdmin
+      supabase
         .from("projects")
         .select("*")
         .eq("id", id)
         .is("deleted_at", null)
         .maybeSingle(),
-      supabaseAdmin
+      supabase
         .from("project_services")
         .select("*")
         .eq("project_id", id)
         .order("service_name", { ascending: true }),
-      supabaseAdmin
+      supabase
         .from("project_workers")
         .select("worker_id, workers!inner(deleted_at)")
         .eq("project_id", id)
@@ -262,7 +261,7 @@ export async function getRecentShiftsForProject(
   projectId: string,
   limit = 20
 ): Promise<RecentShiftRow[]> {
-  const { data: shifts } = await supabaseAdmin
+  const { data: shifts } = await supabase
     .from("shifts")
     .select("id, shift_date, hours, worker_id, workers!inner(deleted_at)")
     .eq("project_id", projectId)
@@ -273,7 +272,7 @@ export async function getRecentShiftsForProject(
   if (!shifts || shifts.length === 0) return [];
 
   const workerIds = [...new Set(shifts.map((s) => s.worker_id))];
-  const { data: workers } = await supabaseAdmin
+  const { data: workers } = await supabase
     .from("workers")
     .select("id, name")
     .in("id", workerIds);
@@ -302,11 +301,11 @@ export async function getRecentShiftsForProject(
  */
 export async function getProjectsByStartMonth(): Promise<ProjectMonthGroup[]> {
   const [projectsResult, shiftsResult] = await Promise.all([
-    supabaseAdmin
+    supabase
       .from("projects")
       .select("id, name, address, status, start_date, activated_at")
       .is("deleted_at", null),
-    supabaseAdmin
+    supabase
       .from("shifts")
       .select("project_id, hours, workers!inner(deleted_at)")
       .is("workers.deleted_at", null),
@@ -360,12 +359,12 @@ export async function getProjectsByStartMonth(): Promise<ProjectMonthGroup[]> {
 /** Every worker with their logged totals — the "Alla Arbetare" list. */
 export async function getWorkerList(): Promise<WorkerListItem[]> {
   const [workersResult, shiftsResult] = await Promise.all([
-    supabaseAdmin
+    supabase
       .from("workers")
       .select("id, name, email, phone, profile_picture_url")
       .is("deleted_at", null)
       .order("name", { ascending: true }),
-    supabaseAdmin
+    supabase
       .from("shifts")
       .select("worker_id, project_id, hours, projects!inner(deleted_at)")
       .is("projects.deleted_at", null),
@@ -419,18 +418,18 @@ export async function getArbetsdagbokData(
   projectId: string
 ): Promise<ArbetsdagbokData | null> {
   const [{ data: project }, servicesResult, shiftsResult] = await Promise.all([
-    supabaseAdmin
+    supabase
       .from("projects")
       .select("id, name, address, client_name, client_address, client_org_number")
       .eq("id", projectId)
       .is("deleted_at", null)
       .maybeSingle(),
-    supabaseAdmin
+    supabase
       .from("project_services")
       .select("service_name")
       .eq("project_id", projectId)
       .order("service_name", { ascending: true }),
-    supabaseAdmin
+    supabase
       .from("shifts")
       .select("worker_id, shift_date, hours, start_time, end_time, workers!inner(deleted_at)")
       .eq("project_id", projectId)
@@ -452,7 +451,7 @@ export async function getArbetsdagbokData(
   const workerIds = [...new Set(shifts.map((s) => s.worker_id))];
   const nameById = new Map<string, string>();
   if (workerIds.length > 0) {
-    const { data: workers, error: workersError } = await supabaseAdmin
+    const { data: workers, error: workersError } = await supabase
       .from("workers")
       .select("id, name")
       .in("id", workerIds);
@@ -517,7 +516,7 @@ export async function getArbetsdagbokData(
 export async function getPassProblems(
   projectId: string
 ): Promise<PassProblem[]> {
-  const { data: shifts, error } = await supabaseAdmin
+  const { data: shifts, error } = await supabase
     .from("shifts")
     .select("id, worker_id, shift_date, hours, start_time, end_time, workers!inner(name, deleted_at)")
     .eq("project_id", projectId)
@@ -582,11 +581,11 @@ export async function getPassProblems(
 /** Everything currently in Papperskorgen, most recently thrown away first. */
 export async function getTrashItems(): Promise<TrashItem[]> {
   const [workersResult, projectsResult] = await Promise.all([
-    supabaseAdmin
+    supabase
       .from("workers")
       .select("id, name, email, phone, deleted_at")
       .not("deleted_at", "is", null),
-    supabaseAdmin
+    supabase
       .from("projects")
       .select("id, name, address, deleted_at")
       .not("deleted_at", "is", null),
@@ -625,7 +624,7 @@ export async function getTrashItems(): Promise<TrashItem[]> {
 
 /** One worker in Papperskorgen. Null when the id is unknown, or still live. */
 export async function getTrashedWorker(id: string): Promise<Worker | null> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("workers")
     .select("*")
     .eq("id", id)
@@ -643,7 +642,7 @@ export async function getTrashedWorker(id: string): Promise<Worker | null> {
 export async function getTrashedProject(
   id: string
 ): Promise<ProjectWithDetails | null> {
-  const { data: project, error } = await supabaseAdmin
+  const { data: project, error } = await supabase
     .from("projects")
     .select("*")
     .eq("id", id)
@@ -656,12 +655,12 @@ export async function getTrashedProject(
   if (!project) return null;
 
   const [{ data: services }, { data: assignments }] = await Promise.all([
-    supabaseAdmin
+    supabase
       .from("project_services")
       .select("*")
       .eq("project_id", id)
       .order("service_name", { ascending: true }),
-    supabaseAdmin
+    supabase
       .from("project_workers")
       .select("worker_id, workers!inner(deleted_at)")
       .eq("project_id", id)
@@ -684,7 +683,7 @@ export async function getTrashedProject(
  * them would give back someone who is no longer on the job they were on.
  */
 export async function getTrashedWorkerIds(): Promise<string[]> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("workers")
     .select("id")
     .not("deleted_at", "is", null);
@@ -708,7 +707,7 @@ export async function getTrashedWorkerIds(): Promise<string[]> {
  * kvarglomma den har skarmen ska gora omojlig.
  */
 export async function getKonton(): Promise<KontoItem[]> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("accounts")
     .select(
       "id, worker_id, status, created_at, workers!inner(name, email, profile_picture_url)"
@@ -749,13 +748,13 @@ export async function getKonton(): Promise<KontoItem[]> {
  */
 export async function getKontoKandidater(): Promise<KontoKandidat[]> {
   const [workersResult, accountsResult] = await Promise.all([
-    supabaseAdmin
+    supabase
       .from("workers")
       .select("id, name, email")
       .is("deleted_at", null)
       .not("email", "is", null)
       .order("name", { ascending: true }),
-    supabaseAdmin.from("accounts").select("worker_id"),
+    supabase.from("accounts").select("worker_id"),
   ]);
 
   const error = workersResult.error ?? accountsResult.error;

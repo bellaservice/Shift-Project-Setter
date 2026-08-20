@@ -1,9 +1,11 @@
+"use client";
+
 import { ProjectMonthList } from "@/components/ProjectMonthList";
 import { ActionRow } from "@/components/Panel";
+import { Query } from "@/components/Query";
 import { CountBadge, Screen } from "@/components/Screen";
 import { getProjectsByStartMonth } from "@/lib/queries";
-
-export const dynamic = "force-dynamic";
+import { useQuery } from "@/lib/useQuery";
 
 /**
  * Alla Project. "Logga Project" star overst, likt "Lagg Till Arbetare" i Alla
@@ -15,10 +17,17 @@ export const dynamic = "force-dynamic";
  * listan — samma tre-i-rad som Hems nyckeltal, men om samma projectlista som
  * borjar tva centimeter langre ner. Antalet star kvar i rubrikens brickan, och
  * timmarna star pa den rad de hor till.
+ *
+ * Brickan lases ur `groups.data` snarare an inifran <Query>, eftersom den sitter
+ * pa <Screen> och inte bland barnen. Innan svaret kommit ar antalet 0 och
+ * brickan ritas inte alls — vilket ar ratt: en bricka som sager "0" medan
+ * listan laddar ar ett pastaende om arkivet, inte ett tecken pa att det laddar.
  */
-export default async function AllaProjectPage() {
-  const groups = await getProjectsByStartMonth();
-  const count = groups.reduce((sum, group) => sum + group.projects.length, 0);
+export default function AllaProjectPage() {
+  const groups = useQuery(() => getProjectsByStartMonth(), []);
+
+  const count =
+    groups.data?.reduce((sum, group) => sum + group.projects.length, 0) ?? 0;
 
   return (
     <Screen
@@ -29,7 +38,9 @@ export default async function AllaProjectPage() {
       back={{ href: "/", label: "Hem" }}
       lead={<ActionRow href="/logga-project" label="Logga Project" />}
     >
-      <ProjectMonthList groups={groups} />
+      <Query state={groups}>
+        {(data) => <ProjectMonthList groups={data} />}
+      </Query>
     </Screen>
   );
 }

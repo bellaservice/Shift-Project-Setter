@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth";
+import { AuthGate } from "@/components/AuthGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -67,9 +69,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               'document.documentElement.setAttribute("data-theme","light")}catch(e){}',
           }}
         />
-        <div className="app-shell mx-auto w-full max-w-2xl flex-1 px-4 py-6">
-          {children}
-        </div>
+        {/* Every screen below this point assumes a signed-in user: the data
+            layer talks to PostgREST directly with the browser's anon key, and
+            the RLS policies answer to the session's JWT rather than to anything
+            this app decides. AuthGate renders the login form in place of the
+            app until that session exists. */}
+        <AuthProvider>
+          <div className="app-shell mx-auto w-full max-w-2xl flex-1 px-4 py-6">
+            <AuthGate>{children}</AuthGate>
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,11 +1,9 @@
-"use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabase } from "@/lib/supabase/browser";
 import { optionalString, requiredString } from "@/lib/formData";
 import { internalPath } from "@/lib/searchParams";
 import { removeProfilePicture, uploadProfilePicture } from "@/lib/storage";
+import { assertLoginEmailUnchanged } from "@/lib/accounts";
 
 /**
  * Creates a worker, or updates the one whose id the form carries — the same
@@ -51,9 +49,9 @@ export async function saveWorker(formData: FormData) {
   if (id) {
     // Read the current photo first: an empty file input means "keep the one you
     // have", so profile_picture_url is only written when a new file arrived.
-    const { data: existing, error: readError } = await supabaseAdmin
+    const { data: existing, error: readError } = await supabase
       .from("workers")
-      .select("profile_picture_url")
+      .select("profile_picture_url, email")
       .eq("id", id)
       .maybeSingle();
     if (readError) {
@@ -61,12 +59,19 @@ export async function saveWorker(formData: FormData) {
     }
     if (!existing) throw new Error("Arbetaren finns inte langre");
 
+    // Har arbetaren ett konto ar hennes e-post ocksa hennes inloggning. Utan
+    // server kan appen inte langre flytta inloggningen efter, sa andringen
+    // stoppas i stallet — och den stoppas HAR, fore bade uppladdningen och
+    // uppdateringen, sa att ett refuserat mail inte hinner lamna efter sig en
+    // ny bild eller en halvsparad rad.
+    await assertLoginEmailUnchanged(id, existing.email, email);
+
     const uploadedUrl = await uploadProfilePicture(formData.get("profile_picture"));
 
     // `deleted_at: null` is the "eller redigerad" half of Papperskorgen: saving
     // an edit to a worker that sits in the bin takes them back out of it. On a
     // worker who was never thrown away it writes back the null already there.
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from("workers")
       .update({
         ...fields,
@@ -86,7 +91,7 @@ export async function saveWorker(formData: FormData) {
       formData.get("profile_picture")
     );
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from("workers")
       .insert({ ...fields, profile_picture_url })
       .select("id")
@@ -97,26 +102,17 @@ export async function saveWorker(formData: FormData) {
     createdId = data.id;
   }
 
-  revalidatePath("/");
-  revalidatePath("/alla-arbetare");
-  revalidatePath("/papperskorg");
-  if (id) {
-    revalidatePath(`/alla-arbetare/${id}`);
-    revalidatePath(`/papperskorg/arbetare/${id}`);
-  }
-
   // Kom man hit mitt i ett annat arende ("+ Lagg Till" i Logga Project) hor man
   // hemma dar igen, med den nya arbetaren utpekad sa att sidan kan bocka i
   // henne. Sidan listar arbetarna och maste las om for att kanna till henne.
   const next = internalPath(optionalString(formData.get("next")));
   if (next) {
-    revalidatePath(next);
-    redirect(createdId ? `${next}?ny=${encodeURIComponent(createdId)}` : next);
+    return createdId ? `${next}?ny=${encodeURIComponent(createdId)}` : next;
   }
 
   // Annars: en redigering kom fran listan och hor hemma dar igen; en ny
   // arbetare utan avsandare lamnar tillbaka till Hem.
-  redirect(id ? "/alla-arbetare" : "/");
+  return id ? "/alla-arbetare" : "/";
 }
 
 /**
@@ -135,7 +131,7 @@ export async function saveWorker(formData: FormData) {
 export async function deleteWorker(formData: FormData) {
   const id = requiredString(formData.get("id"), "Arbetare");
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("workers")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
@@ -146,9 +142,5 @@ export async function deleteWorker(formData: FormData) {
     throw new Error(`Kunde inte ta bort arbetare: ${error.message}`);
   }
 
-  revalidatePath("/");
-  revalidatePath("/alla-arbetare");
-  revalidatePath("/alla-project");
-  revalidatePath("/papperskorg");
-  redirect("/alla-arbetare");
+  return "/alla-arbetare";
 }

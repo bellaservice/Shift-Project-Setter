@@ -1,4 +1,21 @@
 import Image from "next/image";
+import darkPhoto from "../../public/background-8653526_640.jpg";
+import lightPhoto from "../../public/Background for light.jpg";
+
+/* The two backdrop photographs are IMPORTED, not named by their URL.
+   `src="/Background for light.jpg"` is a string the bundler never sees: the
+   browser asks for that exact path every time, so replacing the file leaves the
+   URL identical and any copy already sitting in an HTTP cache, a service worker
+   or the back/forward cache stays valid. You change the picture, the app keeps
+   showing the old one, and nothing in the project is wrong.
+
+   An import makes the file a build input. Next emits it under a URL with a hash
+   of its CONTENT in the name, so a new picture is a new URL and there is
+   nothing for a stale copy to be stale against — the swap is atomic on every
+   device that has ever loaded the app. It also hands `<Image>` the real
+   dimensions, which is what lets it stop guessing at layout.
+
+   The files stay in `public/` so replacing one is still drag-and-drop. */
 
 /**
  * The layer every screen stands on.
@@ -66,11 +83,18 @@ const GLOW: Record<"amber" | "steel" | "ember", { wash: string; core: string }> 
  * so each tone is carried by its own hue at roughly the strength that hue needs
  * to be seen on #eceff3 — and `amber` is not amber here at all, because amber on
  * white is invisible long before it is a light source.
+ *
+ * The alphas are roughly half what they were, and nothing about the light
+ * changed — the colour did. These carry `--color-night-accent`, and the daylight
+ * accent went from a near-grey slate to a cobalt with three times the chroma
+ * (see theme-light.css). At the old strength that reads as a blue panel laid
+ * over the top of the page rather than as light falling on it, which is the one
+ * thing a glow may never look like. Tint follows chroma, not habit.
  */
 const GLOW_LIGHT: Record<"amber" | "steel" | "ember", { wash: string; core: string }> = {
-  amber: { wash: "rgba(99, 138, 169, 0.22)", core: "rgba(99, 138, 169, 0.26)" },
-  steel: { wash: "rgba(99, 138, 169, 0.16)", core: "rgba(148, 163, 184, 0.2)" },
-  ember: { wash: "rgba(192, 57, 47, 0.13)", core: "rgba(99, 138, 169, 0.2)" },
+  amber: { wash: "rgba(11, 95, 214, 0.12)", core: "rgba(11, 95, 214, 0.15)" },
+  steel: { wash: "rgba(11, 95, 214, 0.07)", core: "rgba(148, 163, 184, 0.2)" },
+  ember: { wash: "rgba(192, 57, 47, 0.13)", core: "rgba(11, 95, 214, 0.11)" },
 };
 
 export function Backdrop({ tone }: { tone: BackdropTone }) {
@@ -83,7 +107,16 @@ export function Backdrop({ tone }: { tone: BackdropTone }) {
          printBackground on, so this would come out as a black sheet. */
       className="app-backdrop pointer-events-none fixed inset-0 -z-10 bg-night"
     >
-      {tone === "photo" && <PhotoBand height={520} />}
+      {tone === "photo" && (
+        <>
+          <PhotoBand height={520} />
+          {/* 370 is where the photo band's film has closed — see PhotoBand. The
+              spill starts from the same number so the light picks up exactly
+              where the picture leaves off rather than at a second, unrelated
+              seam. Move one and move the other. */}
+          <PhotoSpill closes={370} />
+        </>
+      )}
       {tone === "veil" && <PhotoBand height={300} veiled />}
       {tone !== "photo" && tone !== "veil" && tone !== "none" && (
         <>
@@ -144,7 +177,7 @@ function PhotoBand({ height, veiled }: { height: number; veiled?: boolean }) {
           the type is. */}
       <div className="theme-dark-only absolute inset-0">
         <Image
-          src="/background-8653526_640.jpg"
+          src={darkPhoto}
           alt=""
           fill
           priority
@@ -162,7 +195,7 @@ function PhotoBand({ height, veiled }: { height: number; veiled?: boolean }) {
 
       <div className="theme-light-only absolute inset-0">
         <Image
-          src="/Background for light.jpg"
+          src={lightPhoto}
           alt=""
           fill
           priority
@@ -224,6 +257,77 @@ function Glow({
         backgroundImage: [
           `radial-gradient(120% 90% at 50% -10%, ${wash} 0%, rgba(0,0,0,0) 62%)`,
           `radial-gradient(48% 42% at 22% 4%, ${core} 0%, rgba(0,0,0,0) 70%)`,
+        ].join(","),
+      }}
+    />
+  );
+}
+
+/**
+ * The light the photograph throws down the rest of Home — daylight only.
+ *
+ * The night theme gets this for free. Its picture is a wall of amber bokeh on
+ * black, so the cards below the wordmark still have lit pixels behind them: the
+ * "Logga Project" slab catches a warm bloom in its top-left corner, "Logga
+ * Timmar" keeps a warm hairline along its top edge, and the whole lower half of
+ * the screen reads as a room with a lamp in it rather than as a list on black.
+ * That warmth is not painted onto the cards — it is behind them, and the glass
+ * is doing what glass does.
+ *
+ * In daylight the same screen fell apart, and the film is why. `#eceff3` at
+ * 370px is opaque, so from the second action row down there is nothing behind
+ * the panes but flat page grey — and a pane of glass over flat grey has nothing
+ * to refract, so it can only render as white. That is the whole reason the
+ * lower half of the daylight Home read as three sheets of paper while the top
+ * bar two centimetres above it read as glass: same material, one of them with a
+ * picture behind it and two of them without.
+ *
+ * So the picture keeps throwing light after it has stopped being a picture.
+ * Two layers, and they are deliberately the same two `Glow` uses on the tones
+ * that have no photograph at all — a wide wash plus an off-centre core — because
+ * this is the same object: a light source in the room, placed where the room's
+ * actual light is. The difference is only that here it hangs off the bottom of
+ * a photograph instead of off the top of the viewport.
+ *
+ * The blue is the photograph's own. Sampled down the light backdrop, its
+ * saturated stops sit around rgb(0,68,131) and rgb(5,57,125) and its mid-tones
+ * around rgb(125,152,190); #5885be is the middle of that, which is what makes
+ * the spill read as the picture continuing rather than as a coloured panel
+ * someone slid under the content. It is deliberately not `--color-night-accent`
+ * (#0b5fd6, the same hue at full chroma) — the accent is the app's voice and
+ * belongs on controls, this is the room's light and belongs behind them. Same
+ * blue, one at speaking volume and one at the volume of a wall.
+ *
+ * Stops in pixels for the same reason every stop in this file is: what has to
+ * be lit is a fixed-height stack of cards, and a percentage of the viewport is
+ * not a fixed height. `closes` is the one number that ties the two together.
+ */
+function PhotoSpill({ closes }: { closes: number }) {
+  return (
+    <div
+      className="theme-light-only absolute inset-x-0 top-0 h-[1100px]"
+      style={{
+        backgroundImage: [
+          /* The core. Wide and shallow — 130% across, 26% down — because it is
+             standing in for the bottom edge of a picture rather than for a bulb:
+             a round hotspot here would read as a spotlight aimed at the second
+             button. Left of centre at 30%, which is where the photograph's own
+             brightest ribbon runs, so the light appears to fall out of the
+             image instead of arriving from somewhere new. */
+          `radial-gradient(110% 28% at 28% ${closes + 20}px, rgba(88, 133, 190, 0.24) 0%, rgba(88, 133, 190, 0) 74%)`,
+          /* The wash. It has to be up to strength BEFORE the film is opaque or
+             the two meet at a visible seam, so it opens 70px above `closes` and
+             peaks 60px below it — the overlap is what makes one continuous
+             light out of a picture and a gradient. Then a long fall: still
+             clearly there under "Logga Timmar" and the Pågående Project row,
+             gone by the time the empty page below them starts, so the screen
+             ends in its own grey rather than in a blue that stops. */
+          `linear-gradient(to bottom,
+             rgba(88, 133, 190, 0) ${closes - 70}px,
+             rgba(88, 133, 190, 0.17) ${closes + 60}px,
+             rgba(88, 133, 190, 0.11) ${closes + 250}px,
+             rgba(88, 133, 190, 0.045) ${closes + 400}px,
+             rgba(88, 133, 190, 0) ${closes + 540}px)`,
         ].join(","),
       }}
     />

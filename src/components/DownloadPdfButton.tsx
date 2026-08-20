@@ -1,97 +1,42 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/Button";
-import { Download, Warning } from "@/components/Icons";
+import { Download } from "@/components/Icons";
 
 /**
- * Downloads the finished PDF the way any file on the web downloads — no print
- * dialog, no printer picker. The server renders it with headless Chrome and
- * sends it back as an attachment.
+ * Hands the finished Arbetsdagbok to the browser's own print dialog, where
+ * "Spara som PDF" is the first destination in the list.
  *
- * Fetched rather than linked so the button can say it is working: generating
- * takes a second or two while a browser starts, and a plain <a> would sit there
- * looking dead. It also lets a failure (no Chrome on the machine) surface as a
- * readable line instead of a blank error page.
+ * It used to fetch `/alla-project/[id]/arbetsdagbok/pdf`, where a route handler
+ * started headless Chrome, rendered this very page, and sent the bytes back as
+ * an attachment. A static export has no route handlers and no Chrome to start,
+ * so that whole path is gone — but note what it was *doing*: printing this page
+ * to PDF. The print stylesheet it relied on is still here, still on this page,
+ * and still the thing that decides what the paper looks like. So the document
+ * is produced by exactly the same rules as before; the only thing that changed
+ * is which browser runs them. It was the server's; now it is the reader's.
+ *
+ * Two consequences worth stating plainly, because the button no longer hides
+ * them: the user picks the destination themselves, and the filename comes from
+ * the browser rather than from `slugify(projectName)`. Both are the price of
+ * not running a server, and neither changes a pixel of the document.
+ *
+ * There is no busy state and nothing to await. `window.print()` blocks on the
+ * dialog and the page is already rendered — the second or two of "Skapar PDF…"
+ * was a browser booting on the server, and there is no browser to boot.
  */
-export function DownloadPdfButton({
-  projectId,
-  disabled,
-}: {
-  projectId: string;
-  disabled?: boolean;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function download() {
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch(
-        `/alla-project/${projectId}/arbetsdagbok/pdf`
-      );
-      if (!response.ok) {
-        setError(await response.text());
-        return;
-      }
-
-      // The filename the server chose lives in Content-Disposition; reuse it so
-      // the saved file is not called after the route.
-      const disposition = response.headers.get("Content-Disposition") ?? "";
-      const match = /filename="([^"]+)"/.exec(disposition);
-      const blob = await response.blob();
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = match?.[1] ?? "Arbetsdagbok.pdf";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      // Revoking immediately can cancel the download in some browsers; one turn
-      // of the event loop is enough for it to have started.
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      setError("Kunde inte hämta PDF:en. Är servern igång?");
-    } finally {
-      setBusy(false);
-    }
-  }
-
+export function DownloadPdfButton({ disabled }: { disabled?: boolean }) {
   return (
     <div className="flex flex-col gap-2">
       <Button
         type="button"
-        onClick={download}
-        disabled={busy || disabled}
+        onClick={() => window.print()}
+        disabled={disabled}
         className="w-full"
       >
-        {/* Ikonen byts mot en snurra medan Chrome startar: knappen ar
-            avstangd i flera sekunder, och en avstangd knapp utan rorelse i
-            ser trasig ut snarare an upptagen. */}
-        {busy ? (
-          <span
-            aria-hidden
-            className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-black/25 border-t-black motion-reduce:animate-none"
-          />
-        ) : (
-          <Download className="h-5 w-5" />
-        )}
-        {busy ? "Skapar PDF…" : "Ladda ner Arbetsdagbok"}
+        <Download className="h-5 w-5" />
+        Spara som PDF
       </Button>
-
-      {/* `role="alert"`: felet dyker upp efter ett tryck, och den som inte ser
-          skarmen far annars ingenting alls tillbaka. */}
-      {error && (
-        <p
-          role="alert"
-          className="flex items-start gap-2 rounded-xl border border-night-danger/40 bg-night-danger/10 p-3.5 text-xs leading-relaxed text-night-danger"
-        >
-          <Warning className="mt-px h-4 w-4 shrink-0" />
-          {error}
-        </p>
-      )}
     </div>
   );
 }

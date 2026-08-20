@@ -25,18 +25,28 @@
    written tomorrow is themed on the day it is written without anyone
    remembering to.
 
-   `--color-black` is deliberately NOT flipped. It is not "the opposite of the
-   ink" in this app — it is the dimmer behind a modal (`bg-black/75`) and the
-   label on the accent slab (`text-black`), and both of those are still black at
-   noon. Black on #638aa9 measures 5.8:1 where white on it measures 3.6:1, so
-   flipping it would have cost the primary button its contrast.
+   `--color-black` is deliberately NOT flipped on `:root`, and the reason is not
+   that it is "the opposite of the ink". It has exactly two jobs in this app,
+   and daylight splits them:
+
+     - the dimmer behind a modal (`bg-black/75`), which is still black at noon
+       and would be a white-out if it were anything else;
+     - the label on a filled slab (`text-black`, and the `/65` and `/50` of it),
+       which cannot be. White on the daylight accent measures 5.8:1 where black
+       on it measures 3.6:1.
+
+   So the token keeps its black at the root, for the dimmer, and is re-pointed
+   at white *on the slabs themselves* near the bottom of this file. That split
+   is a property of the two themes rather than an accident of one colour: the
+   night theme's fills are bright and take a dark label, the day theme's are
+   saturated and take a light one.
 
    WHAT STILL HAS TO BE SAID BY HAND
 
-   Three things do not run through a token, and each gets its own block below:
+   Four things do not run through a token, and each gets its own block below:
    the four glass materials (literal rgba, because a material is a recipe rather
-   than a colour), the amber glows baked into `shadow-[...]` utilities, and the
-   backdrop photograph.
+   than a colour), the amber glows baked into `shadow-[...]` utilities, the
+   label inversion above, and the backdrop photograph.
    =========================================================================== */
 
 :root[data-theme="light"] {
@@ -51,11 +61,40 @@
      the accent instead of sitting on top of it. 15.6:1 on the page. */
   --color-white: #16202b;
 
-  /* The brand's amber does not survive daylight: #ffb92e on white measures
-     1.7:1 and reads as a highlighter smear. #638aa9 clears 4.6:1, which is what
-     lets it carry the small bold text on a link row and not only fills. */
-  --color-night-accent: #638aa9;
-  --color-night-accent-soft: rgba(99, 138, 169, 0.16);
+  /* The accent — the one value in this file that is not a translation.
+
+     The brand's amber does not survive daylight (#ffb92e on white measures
+     1.7:1 and reads as a highlighter smear), so the day theme has to find its
+     own colour rather than adjust the night one. What it may not do is find a
+     quieter one, and the first attempt — #638aa9 — did exactly that. In OKLCH
+     the amber is L .83 / C .161 and that slate was L .62 / C .064: 40% of the
+     chroma. On a page whose ink is deliberately a blue-grey and whose backdrop
+     is blue-grey glass, an accent at 40% chroma is not an accent, it is a third
+     grey. It also measured 3.2:1 on the page, so it never actually had the
+     4.5:1 that carrying small bold text requires.
+
+     This one is taken from the daylight photograph the way the amber is taken
+     from the night one. Sampled, 81% of all the chroma in the glass picture
+     sits in the 250-265° hue band, and its single most saturated pixel is
+     #1033a1 at 265° — so the picture's own colour, at full strength, is a
+     cobalt. #0b5fd6 is L .52 / C .197 / H 259.5: the picture's hue, carrying
+     more chroma than the night amber does, at the lightness where the accent's
+     two contrast jobs meet.
+
+     Those two jobs are what fix the lightness, and in daylight they pull
+     against each other. As text it has to clear 4.5:1 on a near-white page —
+     5.0:1 here, and 5.8:1 on the white of a panel, which is the harder of the
+     two. As a fill it has to carry a label, and the label it can carry is white
+     (5.8:1) rather than black (3.6:1). The amber never had to choose: black is
+     the page at night, so one bright value wins both jobs at once. Here the
+     accent has to be dark, and that is what makes the label flip — see the note
+     on `--color-black` above. */
+  --color-night-accent: #0b5fd6;
+
+  /* .12 where the night theme uses .14, because the same alpha of a colour with
+     three times the chroma is three times the wash — and every one of these
+     tints has text sitting on it. */
+  --color-night-accent-soft: rgba(11, 95, 214, 0.12);
 
   --color-night-line: rgba(22, 32, 43, 0.12);
   --color-night-raised: rgba(22, 32, 43, 0.08);
@@ -92,6 +131,121 @@
    on it. Composited it comes out around 70% white, which puts the ink at 11:1
    even where the card overlaps the darkest part of the photograph. */
 :root[data-theme="light"] .glass {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.34) 0%,
+      rgba(255, 255, 255, 0.16) 48%,
+      rgba(255, 255, 255, 0.12) 100%
+    ),
+    linear-gradient(rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.62));
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid rgba(22, 32, 43, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
+    0 10px 28px -16px rgba(22, 32, 43, 0.4);
+}
+
+/* ---------------------------------------------------------------------------
+   The card, on the three screens that have a photograph behind it — Home
+   (`photo`) and both archives (`veil`).
+
+   The rule above is the card everywhere else, and everywhere else it is right:
+   on the glow tones there is nothing behind a pane but a wash of one colour, so
+   a pane that lets the backdrop through lets *nothing* through, and the only
+   thing left holding the card together is its own density. Over a photograph
+   that same density is the whole problem. 62% white plus a 34% sheen composites
+   to roughly 70% white, and 70% white over a picture is not a pane the picture
+   refracts through — it is a pane the picture is behind. Add a 28px blur on top
+   and what is left of the image underneath is fog. The material read as frosted
+   white plastic rather than as glass, which is exactly what it was.
+
+   So on these three screens the pane trades fill for edge. The four moves, and
+   why each one is the one that makes it liquid rather than merely fainter:
+
+   - The flat base drops 62% -> 26%, and the sheen with it. Composited the pane
+     now sits around 30-35% white against the old 70%, which is the difference
+     between a picture you can name and a picture you can see. This is the whole
+     of the "see through" the material was missing; everything below is what
+     pays for it.
+
+   - The blur drops 28px -> 14px. Blur is what decides whether the backdrop
+     arrives as colour or as shape, and at 28px a photograph arrives as neither:
+     the highlights have already smeared into their neighbours before the pane
+     has had a chance to be transparent. 14px still abstracts the image — you
+     are looking through glass, not through a hole — but the chrome ribbon keeps
+     its direction and its edges, and a shape that moves under the pane as you
+     scroll is the single strongest cue that there is a pane there at all.
+
+   - Saturation goes 140% -> 210%. This is the refraction. Glass bends light by
+     wavelength, so what comes through it is more colourful than what went in,
+     and the backdrop photograph is iridescent — pushing its blues and ambers
+     past life is the closest CSS gets to dispersion. It is also what stops the
+     thinner pane reading as simply washed out: less white, more colour.
+
+   - `brightness(1.08)`, and it is small on purpose. Near-black ink now sits on
+     a third of the white it used to, so the dark streaks in the photograph are
+     the contrast floor of this screen. A gentle lift takes those streaks up
+     without touching the flat page above 1.0, where anything stronger would
+     clip #eceff3 to pure white and cost the panels off the picture the grey
+     that separates them from it.
+
+   What replaces the fill is the rim. The old card was drawn by being lighter
+   than its surroundings; this one is drawn by being *lit* — a near-opaque white
+   hairline along the top, a real bounce along the bottom, and two faint ones
+   down the sides, which together describe a slab with thickness the way an
+   almost-empty pane cannot describe itself. The border goes white rather than
+   near-black for the same reason: a dark outline on a translucent pane reads as
+   a cut-out, and the two shadows underneath already seat it on the page.
+
+   Scoped by `[data-tone]` and not written into `.glass` because the argument is
+   about what is behind the pane, and only these three screens have a picture
+   there. The tone attribute already says which screens those are (see Screen),
+   so nothing new has to be threaded through a component to say it again. */
+:root[data-theme="light"] [data-tone="photo"] .glass,
+:root[data-theme="light"] [data-tone="veil"] .glass {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.44) 0%,
+      rgba(255, 255, 255, 0.12) 22%,
+      rgba(255, 255, 255, 0.05) 64%,
+      rgba(255, 255, 255, 0.16) 100%
+    ),
+    linear-gradient(rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.26));
+  -webkit-backdrop-filter: blur(14px) saturate(210%) brightness(1.08);
+  backdrop-filter: blur(14px) saturate(210%) brightness(1.08);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.55),
+    inset 1px 0 0 rgba(255, 255, 255, 0.3),
+    inset -1px 0 0 rgba(255, 255, 255, 0.3),
+    0 1px 2px rgba(22, 32, 43, 0.06),
+    0 14px 32px -18px rgba(22, 32, 43, 0.55);
+}
+
+/* …except the archive's own top bar, which goes back to the pane above.
+
+   The exception is about the picture, not about the material. Home's band is
+   520px tall and the bar crosses it where the photograph is pale; the archives
+   cut the same picture to 300px, which slides a near-black ribbon straight up
+   under the bar — and `veil` does not dim it, because in daylight there is no
+   dimming a photograph with white, only bleaching it (see Backdrop). Measured
+   in Chrome, "Hem" on the thin pane over that ribbon is 1.2:1. It is not dim,
+   it is gone.
+
+   So the four 44px controls in the archive's bar keep the denser pane and the
+   content panels below them keep the liquid one. That is the right way round:
+   the bar is chrome that has to survive whatever the picture does behind it,
+   and it is four small pills rather than the broad cards the material change is
+   actually for. Home's bar is deliberately NOT included — nothing dark passes
+   under it there, and it is the reference the thinner pane was matched to.
+
+   Scoped to `.app-chrome`, which <Screen> already puts on the bar and the
+   heading, so the badge beside the title is covered by the same rule for the
+   same reason. */
+:root[data-theme="light"] [data-tone="veil"] .app-chrome .glass {
   background-image: linear-gradient(
       to bottom,
       rgba(255, 255, 255, 0.34) 0%,
@@ -146,10 +300,10 @@
 :root[data-theme="light"] .glass-field:focus-visible,
 :root[data-theme="light"] .glass-field:focus,
 :root[data-theme="light"] .glass-field[data-state="open"] {
-  border-color: rgba(99, 138, 169, 0.9);
+  border-color: rgba(11, 95, 214, 0.85);
   box-shadow:
     inset 0 1px 2px rgba(22, 32, 43, 0.07),
-    0 0 0 3px rgba(99, 138, 169, 0.22);
+    0 0 0 3px rgba(11, 95, 214, 0.2);
 }
 
 :root[data-theme="light"] .glass-field:user-invalid {
@@ -188,7 +342,7 @@
 }
 
 :root[data-theme="light"] ::selection {
-  background-color: rgba(99, 138, 169, 0.3);
+  background-color: rgba(11, 95, 214, 0.24);
   color: #0d1620;
 }
 
@@ -274,15 +428,41 @@
    --------------------------------------------------------------------------- */
 :root[data-theme="light"] .bg-night-accent,
 :root[data-theme="light"] [class*="ring-night-accent"] {
-  --tw-shadow-color: rgba(99, 138, 169, 0.55);
+  --tw-shadow-color: rgba(11, 95, 214, 0.24);
 }
 
 /* The pressed state of the accent slab is a hand-picked darker amber sitting in
    an `active:bg-[#e5a41f]` utility — again no token to reach. Specificity does
    the work rather than `!important`: `:root[data-theme]` plus the class plus
-   the pseudo-class outranks the utility's own two. */
+   the pseudo-class outranks the utility's own two.
+
+   Same hue and chroma as the accent, with only its lightness taken down (L .52
+   -> .44). A press is the surface moving away from the light, not a different
+   colour arriving, so L is the one channel allowed to move under a thumb. */
 :root[data-theme="light"] .bg-night-accent:active {
-  background-color: #52768f;
+  background-color: #014ab0;
+}
+
+/* ---------------------------------------------------------------------------
+   The label on a filled slab.
+
+   `text-black` compiles to `var(--color-black)`, so re-pointing that variable
+   ON the slab turns every label the slab carries — the button's own text, the
+   `text-black/65` hint under a month row, the `text-black/50` chevron beside
+   it — without one of them being named here or touched in a component. It is
+   the move the whole file rests on, aimed at the one token that must not change
+   everywhere: `bg-black/75`, the dimmer behind a modal, is nowhere near a slab
+   and keeps the black it needs.
+
+   Both fills, because in daylight both have the same shape — white clears 4.5:1
+   on them and black does not: 5.8 against 3.6 on the accent, 5.4 against 3.9 on
+   the danger red. The class list is exact on purpose. `bg-night-accent` is the
+   solid slab; `bg-night-accent/10` is a different class and a different thing —
+   a pale tint carrying accent-coloured text, which wants no part of this.
+   --------------------------------------------------------------------------- */
+:root[data-theme="light"] .bg-night-accent,
+:root[data-theme="light"] .bg-night-danger {
+  --color-black: #ffffff;
 }
 
 /* ---------------------------------------------------------------------------

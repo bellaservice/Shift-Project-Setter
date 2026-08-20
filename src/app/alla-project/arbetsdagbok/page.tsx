@@ -1,8 +1,13 @@
+"use client";
+
+import { Suspense } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Arbetsdagbok } from "@/components/Arbetsdagbok";
+import { ButtonLink } from "@/components/Button";
 import { Warning } from "@/components/Icons";
-import { Screen } from "@/components/Screen";
+import { PanelSkeleton, Query } from "@/components/Query";
+import { EmptyState, Screen } from "@/components/Screen";
 import {
   ArbetsdagbokSurvey,
   type SurveyQuestion,
@@ -10,8 +15,7 @@ import {
 import { DownloadPdfButton } from "@/components/DownloadPdfButton";
 import { getArbetsdagbokData, getPassProblems } from "@/lib/queries";
 import type { ArbetsdagbokData } from "@/lib/types";
-
-export const dynamic = "force-dynamic";
+import { useQuery } from "@/lib/useQuery";
 
 /**
  * Which of the optional project fields the document would otherwise print empty.
@@ -72,28 +76,58 @@ function missingQuestions(data: ArbetsdagbokData): SurveyQuestion[] {
   return questions;
 }
 
-export default async function ArbetsdagbokPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ fortsatt?: string }>;
-}) {
-  const [{ id }, { fortsatt }] = await Promise.all([params, searchParams]);
+/**
+ * Lag pa /alla-project/[id]/arbetsdagbok; id:t ar numera `?id=`, se noteringen
+ * i /alla-arbetare/redigera.
+ */
+export default function ArbetsdagbokPage() {
+  return (
+    <Suspense fallback={<Laddar />}>
+      <ArbetsdagbokScreen />
+    </Suspense>
+  );
+}
 
-  const [data, passProblems] = await Promise.all([
-    getArbetsdagbokData(id),
-    getPassProblems(id),
-  ]);
-  if (!data) notFound();
+function Laddar() {
+  return (
+    <Screen
+      tone="amber"
+      eyebrow="Arbetsdagbok"
+      title="Arbetsdagbok"
+      back={{ href: "/alla-project", label: "Alla Project" }}
+    >
+      <PanelSkeleton />
+    </Screen>
+  );
+}
 
-  const questions = missingQuestions(data);
-
+function ArbetsdagbokScreen() {
+  const params = useSearchParams();
+  const id = params.get("id") ?? "";
   // `fortsatt` is what the survey sets on its way out, both when it saved
   // answers and when the user chose to generate without them. Without it the
   // survey would reappear forever for a field the client genuinely does not
   // have, or a pass whose span really is longer than its paid hours.
-  if ((questions.length > 0 || passProblems.length > 0) && fortsatt !== "1") {
+  const fortsatt = params.get("fortsatt");
+
+  const bundle = useQuery(async () => {
+    if (!id) return null;
+    const [data, passProblems] = await Promise.all([
+      getArbetsdagbokData(id),
+      getPassProblems(id),
+    ]);
+    return data === null ? null : { data, passProblems };
+  }, [id]);
+
+  // Grinden avgors av det som lastes, sa den kan inte stallas forran svaret ar
+  // har. Fore det ar `bundle.data` undefined och <Query> ritar skelettet.
+  const gated =
+    bundle.data != null &&
+    (missingQuestions(bundle.data.data).length > 0 ||
+      bundle.data.passProblems.length > 0) &&
+    fortsatt !== "1";
+
+  if (bundle.data == null || gated) {
     return (
       // `amber` och inte `ember`. Skarmen ar en grind fore dokumentet, sa den
       // bar Arbetsdagboken i ogonbrynet men inte dess namn i rubriken — men
@@ -103,18 +137,40 @@ export default async function ArbetsdagbokPage({
       // under samma gula lampa som de gor.
       <Screen
         tone="amber"
-        eyebrow={`Arbetsdagbok · ${data.projectName}`}
+        eyebrow={
+          bundle.data
+            ? `Arbetsdagbok · ${bundle.data.data.projectName}`
+            : "Arbetsdagbok"
+        }
         title="Innan dokumentet skapas"
         back={{ href: "/alla-project", label: "Alla Project" }}
       >
-        <ArbetsdagbokSurvey
-          projectId={id}
-          questions={questions}
-          passProblems={passProblems}
-        />
+        <Query state={bundle}>
+          {(loaded) =>
+            loaded === null ? (
+              <EmptyState
+                title="Projectet finns inte."
+                hint="Det kan ha tagits bort. Kolla i Papperskorgen om det ska tillbaka."
+                action={
+                  <ButtonLink href="/alla-project" size="md">
+                    Alla Project
+                  </ButtonLink>
+                }
+              />
+            ) : (
+              <ArbetsdagbokSurvey
+                projectId={id}
+                questions={missingQuestions(loaded.data)}
+                passProblems={loaded.passProblems}
+              />
+            )
+          }
+        </Query>
       </Screen>
     );
   }
+
+  const { data } = bundle.data;
 
   return (
     /* `wide` och `tone="none"`: harifran och ner ar sidan ett vitt A4-ark, det
@@ -123,7 +179,8 @@ export default async function ArbetsdagbokPage({
        inte klippas pa hojden av en sida den aldrig far se.
 
        `ad-noprint` pa allt utom dokumentet: knapparna ska inte folja med in i
-       PDF:en som Chrome renderar ur precis den har sidan. */
+       PDF:en, och nu ar det webblasarens egen utskrift som laser den regeln —
+       samma stilmall, samma resultat, utan server. */
     <Screen
       tone="none"
       eyebrow="Arbetsdagbok"
@@ -156,10 +213,11 @@ export default async function ArbetsdagbokPage({
           </div>
         )}
 
-        <DownloadPdfButton projectId={id} />
+        <DownloadPdfButton />
         <p className="px-1 text-xs leading-relaxed text-white/55">
-          Filen sparas i din nedladdningsmapp. Förhandsvisningen nedan är arken
-          som hamnar i den, i samma ordning och med samma sidbrytning.
+          Välj <strong className="font-bold">Spara som PDF</strong> som
+          destination i dialogen. Förhandsvisningen nedan är arken som hamnar i
+          filen, i samma ordning och med samma sidbrytning.
         </p>
       </div>
 

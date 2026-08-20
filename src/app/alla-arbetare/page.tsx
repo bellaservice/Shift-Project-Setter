@@ -1,10 +1,12 @@
+"use client";
+
 import { ActionRow, PanelList, RowLink, RowMeta } from "@/components/Panel";
 import { ButtonLink } from "@/components/Button";
+import { Query } from "@/components/Query";
 import { CountBadge, EmptyState, Screen } from "@/components/Screen";
 import { formatHoursSv } from "@/lib/format";
 import { getWorkerList } from "@/lib/queries";
-
-export const dynamic = "force-dynamic";
+import { useQuery } from "@/lib/useQuery";
 
 /** Initialen i en skiva, for den som inte har nagot foto. Samma storlek och
  *  form som avataren bredvid, sa raderna radar upp sig aven i en lista dar bara
@@ -46,47 +48,55 @@ function Avatar({ name, url }: { name: string; url: string | null }) {
  * nyckeltal, sa arkivet borjade med att se ut som Hem en gang till. Antalet
  * star kvar i rubrikens bricka, och timmarna star pa den rad de hor till.
  */
-export default async function AllaArbetarePage() {
-  const workers = await getWorkerList();
+export default function AllaArbetarePage() {
+  const roster = useQuery(() => getWorkerList(), []);
 
   return (
     <Screen
       tone="veil"
       eyebrow="Personal"
       title="Alla Arbetare"
-      badge={workers.length > 0 && <CountBadge>{workers.length}</CountBadge>}
+      badge={
+        (roster.data?.length ?? 0) > 0 && (
+          <CountBadge>{roster.data!.length}</CountBadge>
+        )
+      }
       back={{ href: "/", label: "Hem" }}
       lead={<ActionRow href="/ny-arbetare" label="Lägg Till Arbetare" />}
     >
-      {workers.length === 0 ? (
-        <EmptyState
-          title="Inga arbetare registrerade än."
-          hint="Lägg till den första — sedan kan pass loggas på hen."
-          action={
-            <ButtonLink href="/ny-arbetare" size="md">
-              Lägg Till Arbetare
-            </ButtonLink>
-          }
-        />
-      ) : (
-        <PanelList>
-          {workers.map((w) => (
-            <RowLink
-              key={w.id}
-              href={`/alla-arbetare/${w.id}`}
-              media={<Avatar name={w.name} url={w.profile_picture_url} />}
-              title={w.name}
-              subtitle={w.phone ?? w.email ?? "Ingen kontaktuppgift"}
-              meta={
-                <RowMeta
-                  value={`${formatHoursSv(w.totalHours)}h`}
-                  label={`${w.projectCount} project`}
-                />
+      <Query state={roster}>
+        {(workers) =>
+          workers.length === 0 ? (
+            <EmptyState
+              title="Inga arbetare registrerade än."
+              hint="Lägg till den första — sedan kan pass loggas på hen."
+              action={
+                <ButtonLink href="/ny-arbetare" size="md">
+                  Lägg Till Arbetare
+                </ButtonLink>
               }
             />
-          ))}
-        </PanelList>
-      )}
+          ) : (
+            <PanelList>
+              {workers.map((w) => (
+                <RowLink
+                  key={w.id}
+                  href={`/alla-arbetare/redigera?id=${w.id}`}
+                  media={<Avatar name={w.name} url={w.profile_picture_url} />}
+                  title={w.name}
+                  subtitle={w.phone ?? w.email ?? "Ingen kontaktuppgift"}
+                  meta={
+                    <RowMeta
+                      value={`${formatHoursSv(w.totalHours)}h`}
+                      label={`${w.projectCount} project`}
+                    />
+                  }
+                />
+              ))}
+            </PanelList>
+          )
+        }
+      </Query>
     </Screen>
   );
 }

@@ -1,6 +1,4 @@
-import "server-only";
-import { randomUUID } from "node:crypto";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabase } from "@/lib/supabase/browser";
 
 export const PICTURE_BUCKET = "profile-pictures";
 
@@ -27,15 +25,15 @@ export async function uploadProfilePicture(
   if (!(file instanceof File) || file.size === 0) return null;
 
   const ext = file.name.split(".").pop() || "jpg";
-  const path = `${randomUUID()}.${ext}`;
-  const { error } = await supabaseAdmin.storage
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
     .from(PICTURE_BUCKET)
     .upload(path, file, { contentType: file.type });
   if (error) {
     throw new Error(`Kunde inte ladda upp profilbild: ${error.message}`);
   }
 
-  const { data } = supabaseAdmin.storage.from(PICTURE_BUCKET).getPublicUrl(path);
+  const { data } = supabase.storage.from(PICTURE_BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
 
@@ -48,7 +46,7 @@ export async function uploadProfilePicture(
 export async function removeProfilePicture(url: string | null): Promise<void> {
   const path = storagePathFromPublicUrl(url);
   if (!path) return;
-  await supabaseAdmin.storage.from(PICTURE_BUCKET).remove([path]);
+  await supabase.storage.from(PICTURE_BUCKET).remove([path]);
 }
 
 /**
@@ -63,7 +61,7 @@ export async function removeProfilePicture(url: string | null): Promise<void> {
  * in a public bucket after the row was said to be permanently deleted.
  */
 export async function drainStoragePurgeQueue(): Promise<void> {
-  const { data: queued, error } = await supabaseAdmin
+  const { data: queued, error } = await supabase
     .from("storage_purge_queue")
     .select("id, public_url")
     // A bounded bite: the queue only ever grows by one row per purged worker,
@@ -85,13 +83,13 @@ export async function drainStoragePurgeQueue(): Promise<void> {
   const deletable = [...unparseable];
 
   if (removable.length > 0) {
-    const { error: removeError } = await supabaseAdmin.storage
+    const { error: removeError } = await supabase.storage
       .from(PICTURE_BUCKET)
       .remove(removable.map((row) => row.path));
     if (!removeError) deletable.push(...removable.map((row) => row.id));
   }
 
   if (deletable.length > 0) {
-    await supabaseAdmin.from("storage_purge_queue").delete().in("id", deletable);
+    await supabase.from("storage_purge_queue").delete().in("id", deletable);
   }
 }

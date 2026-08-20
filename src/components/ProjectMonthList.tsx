@@ -122,13 +122,13 @@ export function ProjectMonthList({ groups }: { groups: ProjectMonthGroup[] }) {
               {/* Generera ar det man kommer till Alla Project for att gora, sa
                   den bar accentplattan; Redigera ar den tystare av de tva. */}
               <PanelAction
-                href={`/alla-project/${open.id}/arbetsdagbok`}
+                href={`/alla-project/arbetsdagbok?id=${open.id}`}
                 label="Generera Arbetsdagbok"
                 hint="PDF med försättsblad och dagtabeller"
                 primary
               />
               <PanelAction
-                href={`/logga-project/${open.id}`}
+                href={`/logga-project/redigera?id=${open.id}`}
                 label="Redigera Project"
                 hint="Beställare, tjänster och arbetare"
               />

@@ -102,6 +102,23 @@ create table storage_purge_queue (
   enqueued_at timestamptz not null default now()
 );
 
+-- Kontona: vilka som kan logga in i appen, och vem var och en av dem AR.
+-- Inloggningen sjalv (e-post, losenord) bor i auth.users och skapas med
+-- Supabases admin-API; raden har kopplar den till personen i workers. E-posten
+-- man loggar in med ar workers.email och lagras INTE en gang till -- se
+-- supabase/migrations/20260820120000_konton.sql for hela resonemanget och for
+-- de tva triggrarna som haller ihop det.
+create table accounts (
+  id uuid primary key references auth.users(id) on delete cascade,
+  -- Unik: en arbetare har hogst en inloggning.
+  worker_id uuid not null unique references workers(id) on delete cascade,
+  -- Appens ord, inte Auths. Auth kanner bara "bannad eller inte"; skillnaden
+  -- mellan ett tillfalligt och ett permanent stopp star har.
+  status text not null default 'aktiv',
+  created_at timestamptz not null default now(),
+  constraint accounts_status_check check (status in ('aktiv', 'pausad', 'avstangd'))
+);
+
 create table shifts (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id) on delete cascade,
@@ -165,4 +182,5 @@ alter table projects enable row level security;
 alter table project_services enable row level security;
 alter table project_workers enable row level security;
 alter table shifts enable row level security;
+alter table accounts enable row level security;
 alter table storage_purge_queue enable row level security;

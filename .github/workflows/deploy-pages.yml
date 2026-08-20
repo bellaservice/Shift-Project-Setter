@@ -1,0 +1,71 @@
+name: Deploy to GitHub Pages
+
+# Builds the Next.js static export and publishes it to GitHub Pages.
+#
+# Replaces the default Jekyll build, which only ever rendered README.md. The
+# repository's Pages source must be set to "GitHub Actions" for this to run —
+# on the branch setting it is ignored.
+
+on:
+  push:
+    branches: [master]
+  # Lets you re-publish from the Actions tab without pushing a commit.
+  workflow_dispatch:
+
+# GITHUB_TOKEN needs write on pages and id-token for the deploy step to mint
+# its OIDC credential.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two publishes race. `cancel-in-progress: false` so a queued deploy
+# finishes rather than being dropped mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static export
+        env:
+          # The site lives at /Shift-Project-Setter, not at the domain root,
+          # so every asset URL needs the prefix. next.config.ts reads this.
+          NEXT_PUBLIC_BASE_PATH: /Shift-Project-Setter
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      # Without this, Pages runs the output through Jekyll, which silently drops
+      # every directory beginning with an underscore — including _next, i.e. all
+      # the JavaScript and CSS.
+      - name: Disable Jekyll processing
+        run: touch out/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

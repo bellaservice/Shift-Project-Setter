@@ -1,8 +1,5 @@
-"use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabase } from "@/lib/supabase/browser";
 import { requiredString } from "@/lib/formData";
 import { removeProfilePicture } from "@/lib/storage";
 
@@ -18,17 +15,13 @@ import { removeProfilePicture } from "@/lib/storage";
  */
 
 function revalidateTrash(): void {
-  revalidatePath("/");
-  revalidatePath("/alla-project");
-  revalidatePath("/alla-arbetare");
-  revalidatePath("/papperskorg");
 }
 
 /** Takes a worker back out of the bin, with everything they had. */
 export async function restoreWorker(formData: FormData) {
   const id = requiredString(formData.get("id"), "Arbetare");
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("workers")
     .update({ deleted_at: null })
     .eq("id", id)
@@ -38,17 +31,16 @@ export async function restoreWorker(formData: FormData) {
   }
 
   revalidateTrash();
-  revalidatePath(`/alla-arbetare/${id}`);
   // Back to the roster rather than to the bin: seeing the row in the list is
   // the clearest possible confirmation that the restore worked.
-  redirect("/alla-arbetare");
+  return "/alla-arbetare";
 }
 
 /** Takes a project back out of the bin, with its services, workers and passes. */
 export async function restoreProject(formData: FormData) {
   const id = requiredString(formData.get("id"), "Project");
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("projects")
     .update({ deleted_at: null })
     .eq("id", id)
@@ -58,9 +50,7 @@ export async function restoreProject(formData: FormData) {
   }
 
   revalidateTrash();
-  revalidatePath(`/logga-project/${id}`);
-  revalidatePath(`/alla-project/${id}/arbetsdagbok`);
-  redirect("/alla-project");
+  return "/alla-project";
 }
 
 /**
@@ -76,7 +66,7 @@ export async function purgeWorker(formData: FormData) {
 
   // Read the photo first — after the row is gone there is nothing left
   // pointing at the file, and it would sit in the bucket forever.
-  const { data: existing, error: readError } = await supabaseAdmin
+  const { data: existing, error: readError } = await supabase
     .from("workers")
     .select("profile_picture_url")
     .eq("id", id)
@@ -87,7 +77,7 @@ export async function purgeWorker(formData: FormData) {
   }
   if (!existing) throw new Error("Arbetaren finns inte i papperskorgen");
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("workers")
     .delete()
     .eq("id", id)
@@ -99,14 +89,14 @@ export async function purgeWorker(formData: FormData) {
   await removeProfilePicture(existing.profile_picture_url);
 
   revalidateTrash();
-  redirect("/papperskorg");
+  return "/papperskorg";
 }
 
 /** Empties one project out of the bin ahead of the deadline. */
 export async function purgeProject(formData: FormData) {
   const id = requiredString(formData.get("id"), "Project");
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("projects")
     .delete()
     .eq("id", id)
@@ -116,5 +106,5 @@ export async function purgeProject(formData: FormData) {
   }
 
   revalidateTrash();
-  redirect("/papperskorg");
+  return "/papperskorg";
 }

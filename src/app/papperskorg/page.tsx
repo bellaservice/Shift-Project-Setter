@@ -1,17 +1,19 @@
+"use client";
+
 import { PanelList, RowLink } from "@/components/Panel";
+import { Query } from "@/components/Query";
 import { EmptyState, GroupLabel, Screen } from "@/components/Screen";
 import { purgeExpiredTrash } from "@/lib/purge";
 import { getTrashItems } from "@/lib/queries";
 import { formatPurgeNotice } from "@/lib/trash";
 import type { TrashItem } from "@/lib/types";
-
-export const dynamic = "force-dynamic";
+import { useQuery } from "@/lib/useQuery";
 
 /** Where the detail view for one item lives. */
 function trashHref(item: TrashItem): string {
   return item.kind === "worker"
-    ? `/papperskorg/arbetare/${item.id}`
-    : `/papperskorg/project/${item.id}`;
+    ? `/papperskorg/arbetare?id=${item.id}`
+    : `/papperskorg/project?id=${item.id}`;
 }
 
 function TrashSection({ title, items }: { title: string; items: TrashItem[] }) {
@@ -57,13 +59,18 @@ function TrashSection({ title, items }: { title: string; items: TrashItem[] }) {
  * men det kor 02:45 -- utan det har anropet skulle en rad kunna sta kvar och
  * saga "Raderas permanent inom kort" i upp till ett dygn efter att den skulle
  * ha varit borta. Anropet ar idempotent och delar advisory-las med jobbet.
+ *
+ * Gallringen kors numera i webblasaren, under den inloggade anvandarens JWT,
+ * och det ar samma anrop som forr: `purge_expired_trash` ar en SECURITY DEFINER-
+ * funktion, sa vad den far gora bestams av funktionen och inte av vem som
+ * ringer den. Att den ligger forst i samma `useQuery` som listan ar viktigt --
+ * de maste ske i den ordningen, annars visar skarmen rader som just gallrades.
  */
-export default async function PapperskorgPage() {
-  await purgeExpiredTrash();
-  const items = await getTrashItems();
-
-  const projects = items.filter((item) => item.kind === "project");
-  const workers = items.filter((item) => item.kind === "worker");
+export default function PapperskorgPage() {
+  const trash = useQuery(async () => {
+    await purgeExpiredTrash();
+    return getTrashItems();
+  }, []);
 
   return (
     <Screen
@@ -76,17 +83,27 @@ export default async function PapperskorgPage() {
         Papperskorgen blir permanent rensad varje 2 veckor.
       </p>
 
-      {items.length === 0 ? (
-        <EmptyState
-          title="Papperskorgen är tom."
-          hint="Project och arbetare du tar bort hamnar här först — inget försvinner direkt."
-        />
-      ) : (
-        <div className="flex flex-col gap-5">
-          <TrashSection title="Project" items={projects} />
-          <TrashSection title="Arbetare" items={workers} />
-        </div>
-      )}
+      <Query state={trash}>
+        {(items) =>
+          items.length === 0 ? (
+            <EmptyState
+              title="Papperskorgen är tom."
+              hint="Project och arbetare du tar bort hamnar här först — inget försvinner direkt."
+            />
+          ) : (
+            <div className="flex flex-col gap-5">
+              <TrashSection
+                title="Project"
+                items={items.filter((item) => item.kind === "project")}
+              />
+              <TrashSection
+                title="Arbetare"
+                items={items.filter((item) => item.kind === "worker")}
+              />
+            </div>
+          )
+        }
+      </Query>
     </Screen>
   );
 }
