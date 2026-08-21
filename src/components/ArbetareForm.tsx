@@ -1,6 +1,7 @@
 "use client";
 
 import { saveWorker } from "@/app/ny-arbetare/actions";
+import { FormError } from "@/components/FormError";
 import { Button } from "@/components/Button";
 import { EmergencyContactFields } from "@/components/EmergencyContactFields";
 import { Field } from "@/components/Field";
@@ -33,7 +34,7 @@ export function ArbetareForm({
 }) {
   // saveWorker svarar numera med vagen framat i stallet for att kalla pa
   // redirect(), som inte finns i en handelsehanterare. Se useNavigatingAction.
-  const submit = useNavigatingAction(saveWorker);
+  const { submit, error, pending } = useNavigatingAction(saveWorker);
 
   return (
     <form action={submit} className="flex flex-col gap-3.5">
@@ -83,8 +84,12 @@ export function ArbetareForm({
         defaultEmail={worker?.emergency_contact_email ?? ""}
       />
 
-      <Button type="submit" className="mt-1 w-full">
-        {submitLabel}
+      {/* Felet star har och inte langst upp: det ar knappen man tittar pa
+          nar sparandet misslyckas. */}
+      <FormError message={error} />
+
+      <Button type="submit" disabled={pending} className="mt-1 w-full">
+        {pending ? "Sparar…" : submitLabel}
       </Button>
     </form>
   );

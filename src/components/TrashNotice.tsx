@@ -1,4 +1,5 @@
 import { Button } from "@/components/Button";
+import { FormError } from "@/components/FormError";
 import { Restore } from "@/components/Icons";
 import { formatPurgeNotice } from "@/lib/trash";
 
@@ -22,6 +23,7 @@ export function TrashNotice({
   id,
   deletedAt,
   restoreAction,
+  restoreError,
   restoreLabel,
 }: {
   id: string;
@@ -29,6 +31,8 @@ export function TrashNotice({
   deletedAt: string;
   /** Server action som tar emot ett formular med faltet `id`. */
   restoreAction: (formData: FormData) => void | Promise<void>;
+  /** Vad som gick fel i aterstallningen, om nagot gjorde det. */
+  restoreError?: string | null;
   restoreLabel: string;
 }) {
   return (
@@ -40,6 +44,8 @@ export function TrashNotice({
           {restoreLabel}
         </Button>
       </form>
+
+      <FormError message={restoreError ?? null} />
 
       {/* Fristen i accentfarg: den ar sidans enda tickande uppgift, och pa svart
           forsvinner en gra rad text under en gul knapp. */}

@@ -59,7 +59,7 @@ function PapperskorgArbetare() {
 
   // restoreWorker svarar med vagen tillbaka till listan i stallet for att
   // navigera sjalv — se useNavigatingAction.
-  const onRestore = useNavigatingAction(restoreWorker);
+  const { submit: onRestore, error: restoreError } = useNavigatingAction(restoreWorker);
 
   async function onPurge(formData: FormData) {
     await purgeWorker(formData);
@@ -83,6 +83,7 @@ function PapperskorgArbetare() {
             id={worker.data.id}
             deletedAt={worker.data.deleted_at!}
             restoreAction={onRestore}
+            restoreError={restoreError}
             restoreLabel="Återställ Arbetare"
           />
         )

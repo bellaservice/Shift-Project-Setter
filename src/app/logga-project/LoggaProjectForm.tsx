@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { FormError } from "@/components/FormError";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
@@ -135,7 +136,7 @@ function ProjectFields({
     router.push(`/ny-arbetare?next=${encodeURIComponent(path)}`);
   }
 
-  const submit = useNavigatingAction(saveProject);
+  const { submit, error, pending } = useNavigatingAction(saveProject);
 
   return (
     <form
@@ -250,8 +251,10 @@ function ProjectFields({
         )}
       </FormSection>
 
-      <Button type="submit" className="mt-1 w-full">
-        {submitLabel}
+      <FormError message={error} />
+
+      <Button type="submit" disabled={pending} className="mt-1 w-full">
+        {pending ? "Sparar…" : submitLabel}
       </Button>
     </form>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/Button";
+import { FormError } from "@/components/FormError";
 import { DateSelect } from "@/components/DateSelect";
 import { FieldLabel } from "@/components/Field";
 import { FormSection } from "@/components/Panel";
@@ -29,7 +30,7 @@ export function LoggaTimmarForm({
   // Passets langd bors har och inte i <PassFields>: timmarna som skrivs hogst
   // upp i formularet ar samma timmar som ekas bredvid arbetarna langst ner.
   const pass = usePassFields();
-  const submit = useNavigatingAction(logShifts);
+  const { submit, error, pending } = useNavigatingAction(logShifts);
 
   return (
     <form action={submit} className="flex flex-col gap-3.5">
@@ -57,8 +58,10 @@ export function LoggaTimmarForm({
         <WorkerRows workers={workers} hoursLabel={pass.echoHours} />
       </FormSection>
 
-      <Button type="submit" className="mt-1 w-full">
-        Logga Timmar
+      <FormError message={error} />
+
+      <Button type="submit" disabled={pending} className="mt-1 w-full">
+        {pending ? "Sparar…" : "Logga Timmar"}
       </Button>
     </form>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FormError } from "@/components/FormError";
 import { useState } from "react";
 import { saveArbetsdagbokDetaljer } from "@/app/alla-project/arbetsdagbok/actions";
 import { Button } from "@/components/Button";
@@ -74,7 +75,7 @@ export function ArbetsdagbokSurvey({
     });
   }
 
-  const submit = useNavigatingAction(saveArbetsdagbokDetaljer);
+  const { submit, error, pending } = useNavigatingAction(saveArbetsdagbokDetaljer);
 
   return (
     <div className="flex flex-col gap-4">
@@ -144,13 +145,15 @@ export function ArbetsdagbokSurvey({
             fylla i får inte låsa vagen ut. Passen spärrar fortfarande — en rad
             som inte går ihop kan inte skrivas ut — men allt annat skärmen har
             att säga om hur långt man kommit säger den här med ljus. */}
+        <FormError message={error} />
+
         <Button
           type="submit"
-          disabled={unresolved > 0}
+          disabled={unresolved > 0 || pending}
           glow={ready}
           className="mt-1 w-full"
         >
-          Spara och generera
+          {pending ? "Sparar…" : "Spara och generera"}
         </Button>
       </form>
 

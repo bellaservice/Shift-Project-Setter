@@ -63,7 +63,7 @@ function PapperskorgProject() {
 
   // restoreProject svarar med vagen tillbaka till listan i stallet for att
   // navigera sjalv — se useNavigatingAction.
-  const onRestore = useNavigatingAction(restoreProject);
+  const { submit: onRestore, error: restoreError } = useNavigatingAction(restoreProject);
 
   async function onPurge(formData: FormData) {
     await purgeProject(formData);
@@ -82,6 +82,7 @@ function PapperskorgProject() {
             id={bundle.data.project.id}
             deletedAt={bundle.data.project.deleted_at!}
             restoreAction={onRestore}
+            restoreError={restoreError}
             restoreLabel="Återställ Project"
           />
         )
