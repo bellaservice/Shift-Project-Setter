@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { buttonClass } from "@/components/Button";
+import { Button, buttonClass } from "@/components/Button";
 import {
   Chevron,
   DropdownPanel,
@@ -296,13 +296,28 @@ export type TimeWheelField = {
  * Värdet bärs fortfarande av ett riktigt formulärfält: en genomskinlig <select>
  * ligger över knappen, så att `required`, formData och webbläsarens felbubbla
  * fungerar precis som med <input type="time">.
+ *
+ * `required` är numera ett val och inte längre inbyggt. Pass Tider är frivilliga
+ * i Logga Timmar — det är Pass Timmar som bär passets längd — så fältet måste
+ * kunna lämnas tomt utan att webbläsaren stoppar formuläret.
+ *
+ * `onClear` är följdfrågan till det: ett hjul kan bara rullas till ett annat
+ * klockslag, aldrig tillbaka till inget. Utan en väg ut vore "frivilligt" sant
+ * bara fram till första gången man råkat öppna panelen, och ett pass skulle bära
+ * ett spann ingen valt. Knappen visas bara när det finns något att rensa.
  */
 export function TimeRangeSelect({
   start,
   end,
+  required = false,
+  onClear,
 }: {
   start: TimeWheelField;
   end: TimeWheelField;
+  /** Spärra submit tills båda tiderna är valda. Av som standard. */
+  required?: boolean;
+  /** Vägen tillbaka till tomt. Utelämnas den går fältet inte att rensa. */
+  onClear?: () => void;
 }) {
   const dd = useDropdown<"start" | "end">();
   const fields: Array<["start" | "end", TimeWheelField]> = [
@@ -320,7 +335,7 @@ export function TimeRangeSelect({
             <div className="relative min-w-0 flex-1">
               <select
                 name={field.name}
-                required
+                required={required}
                 value={field.value}
                 onChange={(event) => field.onChange(event.target.value)}
                 aria-hidden="true"
@@ -347,6 +362,18 @@ export function TimeRangeSelect({
           </div>
         ))}
       </div>
+
+      {/* Under raden och högerställd: den hör till båda fälten, inte till ettdera,
+          och den ska inte kunna förväxlas med ett tredje klockslag att välja.
+          En riktig ghost-knapp och inte en understruken rad text — 44px är
+          golvet också för det man ångrar. */}
+      {onClear && (start.value !== "" || end.value !== "") && (
+        <div className="mt-1.5 flex justify-end">
+          <Button type="button" variant="ghost" size="md" onClick={onClear}>
+            Rensa tiderna
+          </Button>
+        </div>
+      )}
 
       {open && (
         <DropdownPanel

@@ -34,7 +34,7 @@ export type SurveyQuestion = {
  * projectet respektive passet, så samma fråga ställs inte igen nästa gång.
  *
  * Två sorters fråga, i den ordning dokumentet läses: först försättsbladets
- * uppgifter om projectet, sedan de pass vars dagtabellrad inte går ihop.
+ * uppgifter om projectet, sedan de pass vars Pass Tider-cell skulle bli tom.
  *
  * Varje fråga är ett eget kort med sitt nummer i en accentskiva. Det är den
  * enda skärmen i appen som räknar ner ("2 av 4"), och den räknar för att en
@@ -47,20 +47,24 @@ export type SurveyQuestion = {
  */
 export function ArbetsdagbokSurvey({
   projectId,
+  projectName,
   questions,
   passProblems,
 }: {
   projectId: string;
+  /** Projectets namn, som passfrågorna nämner det. */
+  projectName: string;
   questions: SurveyQuestion[];
   passProblems: PassProblem[];
 }) {
-  const { unresolved, ...pass } = usePassProblemRows(passProblems);
+  const { halvifyllda, obesvarade, ...pass } = usePassProblemRows(passProblems);
 
   // Vilka frågor som fått ett svar. Frågorna spärrar inte submit — ett org.nr
   // som inte finns ska gå att lämna tomt — så det här styr bara om knappen
   // tänds. Därför räcker en mängd med namn i, utan värdena.
   const [answered, setAnswered] = useState<Set<string>>(() => new Set());
-  const ready = unresolved === 0 && answered.size === questions.length;
+  const ready =
+    halvifyllda === 0 && obesvarade === 0 && answered.size === questions.length;
 
   function onAnswer(name: string, value: string) {
     setAnswered((prev) => {
@@ -133,23 +137,30 @@ export function ArbetsdagbokSurvey({
             <div className="px-1 pt-1">
               <h2 className="text-[15px] font-bold text-white">
                 {passProblems.length === 1
-                  ? "Ett pass går inte ihop"
-                  : `${passProblems.length} pass går inte ihop`}
+                  ? "Ett pass saknar Pass Tider"
+                  : `${passProblems.length} pass saknar Pass Tider`}
               </h2>
             </div>
-            <PassTiderRows problems={passProblems} {...pass} />
+            <PassTiderRows
+              problems={passProblems}
+              projectName={projectName}
+              {...pass}
+            />
           </>
         )}
 
-        {/* `glow` och inte `disabled` på frågorna: ett fält som inte går att
-            fylla i får inte låsa vagen ut. Passen spärrar fortfarande — en rad
-            som inte går ihop kan inte skrivas ut — men allt annat skärmen har
-            att säga om hur långt man kommit säger den här med ljus. */}
+        {/* `glow` och inte `disabled`: ett fält som inte går att fylla i får inte
+            låsa vägen ut, och det gäller numera passen också — tider som ingen
+            minns ska gå att lämna tomma, precis som ett org.nr som inte finns.
+            Det ENDA som fortfarande spärrar är ett halvt spann, och det spärrar
+            för att databasen avvisar det: shifts_pass_times_paired tar antingen
+            båda klockslagen eller inget. Allt annat skärmen har att säga om hur
+            långt man kommit säger den med ljus. */}
         <FormError message={error} />
 
         <Button
           type="submit"
-          disabled={unresolved > 0 || pending}
+          disabled={halvifyllda > 0 || pending}
           glow={ready}
           className="mt-1 w-full"
         >

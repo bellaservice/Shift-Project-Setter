@@ -17,8 +17,8 @@ function nextKey(rows: Row[]): number {
  *
  * `hoursLabel` ar timmarna som varje vald arbetare far -- alla pa passet far
  * samma siffra, och den star bredvid raden sa att den syns dar den landar i
- * stallet for bara i faltet langst upp. Null i Pass Tider-laget, dar timmarna
- * redan raknas ut och visas under spannet.
+ * stallet for bara i faltet langst upp. Null tills Pass Timmar ar ett anvandbart
+ * tal: en bricka som star tom eller visar NaN sager mindre an ingen bricka alls.
  */
 export function WorkerRows({
   workers,

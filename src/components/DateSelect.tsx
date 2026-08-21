@@ -29,17 +29,45 @@ import { MONTH_NAMES, daysInMonth, pad } from "@/lib/format";
  * aldrig ser ut som ett fattat beslut. Trycker man pa i dag ar det ett val som
  * alla andra -- da kommer plattan, och punkten blir vit for att synas pa den.
  */
-export function DateSelect() {
+export function DateSelect({
+  label = "Pass Datum",
+  defaultDate,
+}: {
+  /** Fältets rubrik. "Pass Datum" på ett pass, "Datum" på ett ärende. */
+  label?: string;
+  /**
+   * 'YYYY-MM-DD' att öppna på i stället för dagens datum — dagen man tryckte på
+   * i Kalendern, eller den dag ett sparat pass redan ligger på.
+   *
+   * Ett medskickat datum är ett fattat beslut och inte ett förslag, så alla tre
+   * delarna får den svarta plattan direkt. Dagens datum får det fortfarande
+   * inte: skillnaden mellan "det här valde jag" och "det här stod här när jag
+   * kom" är precis vad plattan och punkten är till för.
+   */
+  defaultDate?: string;
+} = {}) {
   const [today] = useState(() => new Date());
-  const [year, setYear] = useState(String(today.getFullYear()));
-  const [month, setMonth] = useState(pad(today.getMonth() + 1));
-  const [dayChoice, setDayChoice] = useState(pad(today.getDate()));
-  const [chosen, setChosen] = useState({ year: false, month: false, day: false });
+  const given = /^(\d{4})-(\d{2})-(\d{2})$/.exec(defaultDate ?? "");
+  const [year, setYear] = useState(given?.[1] ?? String(today.getFullYear()));
+  const [month, setMonth] = useState(given?.[2] ?? pad(today.getMonth() + 1));
+  const [dayChoice, setDayChoice] = useState(given?.[3] ?? pad(today.getDate()));
+  const [chosen, setChosen] = useState(() => {
+    const picked = given !== null;
+    return { year: picked, month: picked, day: picked };
+  });
 
   const dd = useDropdown<"year" | "month" | "day">();
 
   const currentYear = today.getFullYear();
-  const years = [currentYear - 1, currentYear, currentYear + 1].map(String);
+  // I fjol, i år och nästa år räcker för ett pass. Det valda året läggs till om
+  // det ligger utanför — Kalendern kan bläddras hur långt som helst, och ett
+  // ärende i mars 2029 får inte öppna ett årsfält som saknar 2029 och därmed
+  // tyst flytta sig till i år.
+  const years = [
+    ...new Set([currentYear - 1, currentYear, currentYear + 1, Number(year)]),
+  ]
+    .sort((a, b) => a - b)
+    .map(String);
 
   const maxDay = daysInMonth(Number(year), Number(month));
   const day = Number(dayChoice) <= maxDay ? dayChoice : pad(maxDay);
@@ -54,7 +82,7 @@ export function DateSelect() {
 
   return (
     <div>
-      <FieldLabel>Pass Datum</FieldLabel>
+      <FieldLabel>{label}</FieldLabel>
 
       <input type="hidden" name="year" value={year} />
       <input type="hidden" name="month" value={month} />

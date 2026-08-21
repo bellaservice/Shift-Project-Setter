@@ -1,27 +1,38 @@
 
 import { supabase } from "@/lib/supabase/browser";
 import { optionalString, requiredString } from "@/lib/formData";
-import { passSpanHours } from "@/lib/format";
 
 /**
- * 'HH:MM' (eller 'HH:MM:SS') normaliserat till 'HH:MM:SS' for Postgres `time`.
- * formData ar inte formularet -- den kan innehalla vad som helst, oavsett vad
- * tidshjulet lat anvandaren valja.
+ * 'HH:MM' (eller 'HH:MM:SS') normaliserat till 'HH:MM:SS' for Postgres `time`,
+ * eller null nar faltet lamnats tomt. formData ar inte formularet -- den kan
+ * innehalla vad som helst, oavsett vad tidshjulet lat anvandaren valja.
  */
-function requiredTime(value: FormDataEntryValue | null, fieldLabel: string): string {
-  const raw = requiredString(value, fieldLabel);
+function optionalTime(
+  value: FormDataEntryValue | null,
+  fieldLabel: string
+): string | null {
+  const raw = optionalString(value);
+  if (raw === null) return null;
+
   const match = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(raw);
   if (!match) throw new Error(`${fieldLabel} maste vara en tid, t.ex. 07:00`);
   return `${match[1]}:${match[2]}:${match[3] ?? "00"}`;
 }
 
 /**
- * Skriver tillbaka de pass enkaten lat anvandaren ratta, sa att dagtabellens
- * tva kolumner sager samma sak.
+ * Skriver in de Pass Tider enkaten fragade efter.
  *
- * Kravet ar detsamma som kortet visar: spannet mellan Pass Tider MASTE vara de
- * Pass Timmar som star bredvid. Knappen ar avstangd tills det stammer, sa ett
- * fel har betyder att formData kom nagon annanstans ifran an formularet.
+ * Bara tiderna. Timmarna ror den har atgarden inte langre: de ar redan satta i
+ * Logga Timmar, de ar det som betalas, och sedan lagesskenan togs bort ur
+ * <PassFields> behover de inte stamma med spannet -- en obetald rast ar precis
+ * skillnaden mellan de tva. Att skriva om dem har vore att andra en lonesumma
+ * for att en dokumentcell sag tom ut.
+ *
+ * Ett obesvarat kort hoppas over i stallet for att avvisas. Tider som ingen
+ * minns ska ga att lamna tomma; cellen blir da tom i dokumentet, vilket ar
+ * exakt vad den var innan fragan stalldes. Ett HALVT svar avvisas daremot --
+ * shifts_pass_times_paired tar antingen bada klockslagen eller inget, och ett
+ * fel har ar begripligare an ett constraint-fel fran databasen.
  */
 async function savePassCorrections(formData: FormData) {
   const count = Number(formData.get("pass_count") ?? 0);
@@ -33,27 +44,22 @@ async function savePassCorrections(formData: FormData) {
       .filter((id) => id.length > 0);
     if (ids.length === 0) continue;
 
-    const hours = Number(formData.get(`pass_hours_${i}`));
-    if (!Number.isFinite(hours) || hours <= 0) {
-      throw new Error("Pass Timmar maste vara ett tal storre an 0");
-    }
+    const start_time = optionalTime(formData.get(`pass_start_${i}`), "Pass start");
+    const end_time = optionalTime(formData.get(`pass_end_${i}`), "Pass slut");
 
-    const start_time = requiredTime(formData.get(`pass_start_${i}`), "Pass start");
-    const end_time = requiredTime(formData.get(`pass_end_${i}`), "Pass slut");
-
-    const span = passSpanHours(start_time, end_time);
-    if (span === null || Math.abs(span - hours) > 0.01) {
+    if (start_time === null && end_time === null) continue;
+    if (start_time === null || end_time === null) {
       throw new Error(
-        `Pass Tider ${start_time.slice(0, 5)}-${end_time.slice(0, 5)} ar inte ${hours} timmar`
+        "Fyll i bade Pass start och Pass slut, eller lamna bada tomma"
       );
     }
 
-    // Alla arbetare pa passet loggades med samma tider och samma timmar, och
-    // rattas darfor tillsammans -- annars skulle en av raderna sta kvar med det
-    // gamla spannet i samma dagtabell.
+    // Alla arbetare pa passet loggades med samma tider, och far dem darfor
+    // tillsammans -- annars skulle en av raderna sta kvar med en tom cell i
+    // samma dagtabell.
     const { error } = await supabase
       .from("shifts")
-      .update({ hours, start_time, end_time })
+      .update({ start_time, end_time })
       .in("id", ids);
     if (error) throw new Error(`Kunde inte spara passet: ${error.message}`);
   }

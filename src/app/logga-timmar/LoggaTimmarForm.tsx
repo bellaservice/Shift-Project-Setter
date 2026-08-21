@@ -17,15 +17,25 @@ import { LoggaTimmarProjectSelect } from "./LoggaTimmarProjectSelect";
  * Ett pass, i tre steg: hur langt det var, nar och var det var, och vilka som
  * gick det. Grupperna ar precis de tre fragorna — och ordningen ar avsiktlig,
  * for langden ar det man kommer ihag samst och darfor skriver in forst.
+ *
+ * Tre av de fyra fälten är obligatoriska, och det är precis de tre som gör
+ * passet till ett pass: Pass Timmar, Pass Datum och Project. Pass Tider är det
+ * fjärde och det enda frivilliga — se <PassFields>.
  */
 export function LoggaTimmarForm({
   projects,
   workers,
   selectedProjectId,
+  defaultDate,
+  returnTo,
 }: {
   projects: Project[];
   workers: Worker[];
   selectedProjectId: string;
+  /** 'YYYY-MM-DD' från Kalendern: dagen man tryckte på är redan ifylld. */
+  defaultDate?: string;
+  /** Vart man ska tillbaka efter sparandet. Utan den: Hem. */
+  returnTo?: string;
 }) {
   // Passets langd bors har och inte i <PassFields>: timmarna som skrivs hogst
   // upp i formularet ar samma timmar som ekas bredvid arbetarna langst ner.
@@ -34,12 +44,18 @@ export function LoggaTimmarForm({
 
   return (
     <form action={submit} className="flex flex-col gap-3.5">
+      {/* Kommer man från Kalendern ska man tillbaka dit, till den dag man just
+          fyllde på. Ett dolt fält och inte ett argument till `logShifts`:
+          åtgärden svarar med vart användaren ska, och det är ett faktum om
+          skärmen som anropade den — se useNavigatingAction. */}
+      {returnTo && <input type="hidden" name="retur" value={returnTo} />}
+
       <FormSection title="Passet">
         <PassFields {...pass} />
       </FormSection>
 
       <FormSection title="När och var">
-        <DateSelect />
+        <DateSelect defaultDate={defaultDate} />
         <div>
           <FieldLabel>
             Project

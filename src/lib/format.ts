@@ -148,3 +148,87 @@ export function daysInMonth(year: number | null, month: number | null) {
   // Dag 0 i nasta manad ar sista dagen i den har.
   return new Date(Date.UTC(year ?? 2000, month, 0)).getUTCDate();
 }
+
+/**
+ * 'YYYY-MM-01' for the month `delta` months away from `monthStart`.
+ *
+ * The whole reason month arithmetic is done on the *string* rather than on a
+ * Date: `new Date(2026, 0, 31)` plus one month is the 3rd of March, because
+ * JavaScript rolls the overflow forward. A month start has no day to overflow,
+ * so 12 and -1 are the only two cases there are.
+ */
+export function shiftMonth(monthStart: string, delta: number): string {
+  const [year, month] = monthStart.split("-").map(Number);
+  // Months as a flat count from year 0, so a delta of any size lands right.
+  const total = year * 12 + (month - 1) + delta;
+  return `${Math.floor(total / 12)}-${pad((total % 12) + 1)}-01`;
+}
+
+/**
+ * Today on the Swedish wall clock, 'YYYY-MM-DD'.
+ *
+ * Anchored on Europe/Stockholm and not on UTC, for the same reason
+ * `stockholmMonthStart` is (spec LD-1.1): between Stockholm midnight and UTC
+ * midnight, a UTC-derived "today" is still yesterday — which in the Kalender
+ * would put the today-ring on the wrong square for two hours every night.
+ */
+export function stockholmToday(): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
+ * Which column a date sits in on a Monday-first grid: 0 = mandag … 6 = sondag.
+ *
+ * Read through Date.UTC and getUTCDay, never through the local calendar: a
+ * 'YYYY-MM-DD' is a calendar date and has no time in it, and parsing it in a
+ * timezone west of UTC would slide every square one day to the left.
+ */
+export function weekdayIndex(isoDate: string): number {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  // getUTCDay is Sunday-first; Sweden reads a calendar Monday-first.
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
+}
+
+/** The column headings of the Kalender grid, Monday first. */
+export const WEEKDAY_SHORT = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
+
+const WEEKDAY_DATE_FORMATTER = new Intl.DateTimeFormat("sv-SE", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: "UTC",
+});
+
+/**
+ * "Fredag 21 augusti" — the heading over one day's sheet in the Kalender.
+ *
+ * Built on a UTC-noon Date so the formatter cannot cross a date line on its way
+ * out, the same trick `formatMonthNameSv` uses. The year is left off: the sheet
+ * is opened from a grid that already names the month and year above it.
+ */
+export function formatWeekdayDateSv(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const text = WEEKDAY_DATE_FORMATTER.format(new Date(Date.UTC(y, m - 1, d, 12)));
+  return text.charAt(0).toLocaleUpperCase("sv-SE") + text.slice(1);
+}
+
+/**
+ * 'YYYY-MM-DD' as the app writes it, or null.
+ *
+ * The one gate every date that arrives from the query string passes through.
+ * `?datum=` is part of the visit rather than part of the app, so it can hold
+ * anything at all — and a screen that reads it straight would happily render a
+ * month grid for "2026-13-99".
+ */
+export function parseIsoDate(value: string | null | undefined): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  if (m < 1 || m > 12) return null;
+  if (d < 1 || d > daysInMonth(y, m)) return null;
+  return value;
+}

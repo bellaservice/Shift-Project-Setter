@@ -241,6 +241,34 @@
   html {
     color-scheme: dark;
     background-color: var(--color-night);
+
+    /* The page moves up and down and in no other direction. That is two
+       separate problems, so it takes two declarations.
+
+       `overscroll-behavior-x` is the one that removes the *feeling* of
+       flimsiness. Even with nothing at all to scroll sideways, a trackpad flick
+       or a thumb drag rubber-bands the whole app a few pixels and — in Chrome
+       and Safari — arms the browser's own back/forward navigation gesture, so
+       the page slides under the finger and can leave the app entirely on a
+       swipe nobody meant to make. `none` refuses that, and it has to sit on
+       <html>: the gesture belongs to the viewport, not to any element inside
+       it, so the same line on a wrapper div does nothing.
+
+       `overflow-x` is the one that removes the *cause*. Nothing in this
+       layout is meant to be wider than the window, but one unbroken project
+       name or one preview sheet at an unlucky window width is all it takes, and
+       the symptom is a page that slides thirty pixels sideways into empty
+       black. Clipping turns that class of bug into something visible at the
+       right edge — and therefore fixable — instead of into an app that wobbles.
+
+       `hidden` rather than `clip`: `hidden` makes <html> a scroll
+       container, which would break `position: sticky` on anything inside it.
+       The app has none today (checked), and `clip` — which avoids that — is
+       not reliably propagated from the root element to the viewport, where this
+       property has to land to do anything at all. If a sticky bar is ever added
+       here, this line moves to a wrapper element rather than changing value. */
+    overscroll-behavior-x: none;
+    overflow-x: hidden;
   }
 
   /* Note what is NOT here: a background on <body>.
@@ -321,6 +349,15 @@
   body {
     background: #ffffff !important;
     color-scheme: light;
+
+    /* The screen rule above clips the page sideways so the app cannot be
+       swiped off its axis. On paper that clip is actively dangerous: an
+       `overflow` other than `visible` on the root is the classic way to make
+       Chrome paginate a long document into exactly one page, and the
+       Arbetsdagbok PDF is a headless-Chrome print of a document that is
+       expected to run to several. Nothing on paper can be swiped, so the rule
+       has nothing to buy here — it is given back for the print run only. */
+    overflow: visible !important;
   }
 
   /* The app's own furniture never reaches the paper. `app-backdrop` matters

@@ -138,28 +138,29 @@ export type ArbetsdagbokDay = {
 };
 
 /**
- * Ett pass vars två kolumner i arbetsdagboken inte går ihop, som det ser ut i
- * frågan innan dokumentet skapas.
+ * Ett pass som saknar "Pass Tider", som frågan innan arbetsdagboken skapas
+ * behöver det.
  *
- * Ett pass, inte en rad: samma dag med samma tider och samma timmar loggades in
- * i ett svep för flera arbetare, och då ska det rättas i ett svep också.
- * `shiftIds` är raderna bakom det — en per arbetare i `workers`.
+ * Bara det som saknas. Ett pass vars spann inte är dess timmar är sedan
+ * omskrivningen av Logga Timmar INTE ett problem: timmarna är egna och betalda,
+ * spannet är när man var på plats, och en obetald rast mellan dem är det
+ * normala fallet snarare än ett fel att rätta. Det som fortfarande behöver
+ * frågas är en tom cell — dokumentet har då inget att skriva i kolumnen alls.
+ *
+ * Ett pass, inte en rad: samma dag med samma timmar loggades in i ett svep för
+ * flera arbetare, och då ska det besvaras i ett svep också. `shiftIds` är
+ * raderna bakom det — en per arbetare i `workers`.
  */
 export type PassProblem = {
   shiftIds: string[];
   /** 'YYYY-MM-DD', dagen passet ligger under i dagtabellerna. */
   date: string;
-  /** Arbetarnas namn, i bokstavsordning, bara till att känna igen passet på. */
+  /** Arbetarnas namn, i bokstavsordning. Står i frågan: "Vilken tid började
+   *  och slutade Anna den ... ". */
   workers: string[];
-  /** Kolumnen "Pass Timmar". */
+  /** Kolumnen "Pass Timmar". Bara sammanhang i frågan — den är redan besvarad
+   *  och ändras inte här. */
   hours: number;
-  /** Kolumnen "Pass Tider", 'HH:MM'. Null när passet loggades innan kolumnerna
-   *  fanns — då står cellen tom i dokumentet. */
-  startTime: string | null;
-  endTime: string | null;
-  /** 'saknar': ingen tid alls att skriva ut. 'stammer-ej': båda tiderna finns,
-   *  men spannet mellan dem är inte de timmar som står på raden. */
-  kind: "saknar" | "stammer-ej";
 };
 
 /** Everything the Arbetsdagbok document renders, already folded into the shape
@@ -247,4 +248,86 @@ export type KontoKandidat = {
   id: string;
   namn: string;
   epost: string | null;
+};
+
+/** Vem ett ärende visas för. Genomdrivs av RLS, inte av UI:t — se
+ *  supabase/migrations/20260821120000_arenden.sql. */
+export type ArendeSynlighet = "alla" | "egen" | "valda";
+
+/**
+ * Ett bokat ärende — en avtalad tid i Kalendern.
+ *
+ * Skilt från ett pass med flit: ett pass är arbetad tid som betalas ut och som
+ * hamnar i Arbetsdagboken, ett ärende är något som ska hända och som ingen
+ * timsumma i appen räknar med. Se supabase/migrations/20260821120000_arenden.sql.
+ */
+export type Arende = {
+  id: string;
+  titel: string;
+  anteckning: string | null;
+  /** 'YYYY-MM-DD'. */
+  arende_date: string;
+  /** Postgres `time`, alltså 'HH:MM:SS'. Båda null = heldag. */
+  start_time: string | null;
+  end_time: string | null;
+  plats: string | null;
+  /** Färgslug ur ARENDE_FARGER i src/lib/arendeFarger.ts. */
+  farg: string;
+  synlighet: ArendeSynlighet;
+  /** auth.users.id för den som skapade ärendet. Sätts av databasen och går inte
+   *  att ändra. Null bara om kontot raderats efteråt. */
+  skapad_av: string | null;
+  created_at: string;
+};
+
+/** Ett ärende som dess formulär läser in det: raden plus de konton den visas
+ *  för, vilka bor i en egen tabell. */
+export type ArendeDetalj = Arende & {
+  /** accounts.id för varje ikryssat konto. Tom om synlighet inte är 'valda'. */
+  tittare: string[];
+};
+
+/** En ruta i Kalenderns månadsrutnät. En dag utan någonting alls får ingen rad
+ *  i svaret — rutnätet ritar de tomma dagarna själv. */
+export type CalendarDay = {
+  /** 'YYYY-MM-DD'. */
+  date: string;
+  /** Summan av dagens pass. Rutan skriver inte ut den — den står i namnen i
+   *  stället — men månadssumman under rutnätet byggs av den. */
+  totalHours: number;
+  /** Arbetarna som har ett pass den dagen, i bokstavsordning. Det är DE som
+   *  står i rutan: "vem jobbade" är frågan man ställer till en kalender, och
+   *  en timsiffra utan namn svarar inte på den. */
+  workerNames: string[];
+  /** Färgsluggarna för dagens ärenden, i visningsordning. */
+  arendeFarger: string[];
+};
+
+/** Ett loggat pass, som dagens lista i Kalendern visar det. */
+export type DayShift = {
+  id: string;
+  workerId: string;
+  workerName: string;
+  projectId: string;
+  /** Project Namn, med adressen som reserv — alltid `projectLabel`. */
+  projectName: string;
+  hours: number;
+  /** 'HH:MM', eller null när passet loggades utan Pass Tider. */
+  startTime: string | null;
+  endTime: string | null;
+};
+
+/** Ett pass som dess redigeringsskärm läser in det. */
+export type ShiftDetail = {
+  id: string;
+  /** 'YYYY-MM-DD'. */
+  shiftDate: string;
+  projectId: string;
+  workerId: string;
+  /** Bara till att känna igen passet på — arbetaren går inte att byta. */
+  workerName: string;
+  hours: number;
+  /** 'HH:MM', eller null. */
+  startTime: string | null;
+  endTime: string | null;
 };

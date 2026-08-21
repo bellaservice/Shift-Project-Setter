@@ -6,16 +6,23 @@ import { useEffect, useState } from "react";
 import { ChevronRight } from "@/components/Icons";
 
 /**
- * The three destinations the menu offers. Deliberately not every screen in the
+ * The four destinations the menu offers. Deliberately not every screen in the
  * app: Logga Project and Logga Timmar have their own full-width buttons on Home,
  * so listing them here would only duplicate what is already on screen. "Hem" is
- * what gets you back once you are inside one of the two list pages.
+ * what gets you back once you are inside one of the list pages.
+ *
+ * Kalendern is here rather than on Home because it is a place and not an action.
+ * The two buttons on Home make something; this one is where you go to look — at
+ * a month, at a day, at what a Tuesday actually held. It sits directly under
+ * "Hem" because it is the second answer to "what is going on right now", and the
+ * first one that can answer it for a day that is not today.
  *
  * Papperskorgen is deliberately NOT here — it lives behind the cog on the right
  * (SettingsMenu). This menu is the work you are doing; that one is the app.
  */
 const NAV = [
   { href: "/", label: "Hem" },
+  { href: "/kalender", label: "Kalender" },
   { href: "/alla-project", label: "Alla Project" },
   { href: "/alla-arbetare", label: "Alla Arbetare" },
 ];

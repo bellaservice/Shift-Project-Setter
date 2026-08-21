@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { FIELD_BOX, FieldHint, FieldLabel } from "@/components/Field";
-import { Check, Warning } from "@/components/Icons";
+import { FieldHint, FieldLabel } from "@/components/Field";
+import { Clock } from "@/components/Icons";
 import { TimeRangeSelect } from "@/components/TimeWheelSelect";
-import { formatHoursSv, pad, passSpanHours } from "@/lib/format";
+import { formatHoursSv, formatWeekdayDateSv, pad, passSpanHours } from "@/lib/format";
 import type { PassProblem } from "@/lib/types";
 
 /** Klockslaget `hours` timmar efter `start`, som 'HH:MM'. Vänder vid midnatt —
@@ -18,24 +18,26 @@ function addHours(start: string, hours: number): string | null {
   return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 }
 
+/** ["Anna", "Björn", "Carl"] -> "Anna, Björn och Carl". Frågan nämner den eller
+ *  de som gick passet vid namn, och ett pass loggas ofta på flera samtidigt. */
+function joinNames(names: string[]): string {
+  if (names.length === 0) return "arbetaren";
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(", ")} och ${names[names.length - 1]}`;
+}
+
 type PassRow = {
   start: string;
   end: string;
-  hours: string;
 };
 
 /**
- * Håller de rättade passen. Ligger i en hook för att `unresolved` ska nå
- * knappen längst ner i enkäten, på samma sätt som <PassFields> når
- * arbetarraderna i Logga Timmar.
+ * Håller svaren. Ligger i en hook för att räkningen ska nå knappen längst ner i
+ * enkäten, på samma sätt som <PassFields> når arbetarraderna i Logga Timmar.
  */
 export function usePassProblemRows(problems: PassProblem[]) {
   const [rows, setRows] = useState<PassRow[]>(() =>
-    problems.map((p) => ({
-      start: p.startTime ?? "",
-      end: p.endTime ?? "",
-      hours: String(p.hours),
-    }))
+    problems.map(() => ({ start: "", end: "" }))
   );
 
   function patch(index: number, part: Partial<PassRow>) {
@@ -44,77 +46,79 @@ export function usePassProblemRows(problems: PassProblem[]) {
 
   function setStart(index: number, start: string) {
     const row = rows[index];
-    // Ett pass som saknar tider har bara timmarna att gå på, så slutet föreslås
-    // ur dem: väljer man 07:30 på ett åttatimmarspass står det 15:30 innan man
-    // hunnit fram till andra hjulet. Ett slut som redan står kvar rörs inte.
-    const suggested = row.end === "" ? addHours(start, Number(row.hours)) : null;
+    // Passet har bara sina timmar att gå på, så slutet föreslås ur dem: väljer
+    // man 07:30 på ett åttatimmarspass står det 15:30 innan man hunnit fram
+    // till andra hjulet. Ett slut som redan står kvar rörs inte.
+    const suggested = row.end === "" ? addHours(start, problems[index].hours) : null;
     patch(index, suggested ? { start, end: suggested } : { start });
   }
 
-  const state = rows.map((row) => {
-    const hours = Number(row.hours);
-    const span = passSpanHours(row.start, row.end);
-    const hoursOk = row.hours.trim() !== "" && Number.isFinite(hours) && hours > 0;
-    return {
-      row,
-      span,
-      hours,
-      hoursOk,
-      /** Kolumnerna säger samma sak — det är det här enkäten är till för. */
-      agrees: hoursOk && span !== null && Math.abs(span - hours) <= 0.01,
-    };
-  });
+  const state = rows.map((row) => ({
+    row,
+    span: passSpanHours(row.start, row.end),
+    /** Frågan är besvarad — båda klockslagen står där. */
+    answered: row.start !== "" && row.end !== "",
+    /** Ett klockslag utan sitt andra. shifts_pass_times_paired avvisar det, så
+     *  det är det enda som faktiskt måste spärra vägen ut. */
+    halfFilled: (row.start !== "") !== (row.end !== ""),
+  }));
 
   return {
     state,
     setStart,
     setEnd: (index: number, end: string) => patch(index, { end }),
-    setHours: (index: number, hours: string) => patch(index, { hours }),
-    /** Hur många pass som inte går ihop. */
-    unresolved: state.filter((s) => !s.agrees).length,
+    /** Hur många kort som har ett klockslag men inte det andra. */
+    halvifyllda: state.filter((s) => s.halfFilled).length,
+    /** Hur många frågor som ännu inte fått ett svar. Spärrar ingenting — ett
+     *  pass vars tider ingen minns ska gå att lämna tomt — men knappen längst
+     *  ner tänds inte förrän de är noll. */
+    obesvarade: state.filter((s) => !s.answered).length,
   };
 }
 
 /**
- * Ett kort per pass som inte går ihop, med samma två kolumner som dagtabellen
- * skriver ut: Pass Timmar och Pass Tider. Båda går att ändra — vilken av dem
- * som är fel vet bara den som var där — och kortet kvitterar först när spannet
- * mellan tiderna ÄR timmarna bredvid.
+ * Ett kort per pass som saknar Pass Tider, ställt som en fråga i klartext:
+ * "Vilken tid började och slutade Anna den 21 augusti på Storgatan projectet?"
  *
- * Kortet har EN farg, och det ar accentens gula: den lyser sa lange raden ar
- * obesvarad och slocknar nar den gar ihop. Ingen gron kvittens. Ett gront kort
- * ar ett andra fargsprak att lasa mitt i en skarm som redan har ett, och det
- * sager dessutom fel sak — att raden ar klar ar inte en handling, det ar bara
- * att den slutat vanta. Det som lyser upp nar allt gar ihop ar den gula knappen
- * langst ner, for det ar det enda som ar kvar att gora.
+ * Så formulerad därför att det ÄR en fråga, till en människa som var där eller
+ * som vet vem som var det. Kortet stod tidigare med två kolumner och en etikett
+ * över var — "Pass Timmar" och "Pass Tider" — och lät användaren lista ut vad
+ * den skulle göra med dem. Ett dokument som saknar en uppgift kan lika gärna be
+ * om den med ord.
  *
- * Kvittensraden bar beskedet i ord och med en ikon, sa att en slocknad kant
- * aldrig ar det enda som sager att raden ar klar.
+ * Kortet ber om EN sak: de två klockslagen. Passets timmar står med som
+ * sammanhang men går inte att ändra här — de är redan besvarade, de är det som
+ * betalas, och sedan Logga Timmar skrevs om behöver de inte längre stämma med
+ * spannet. Skiljer sig de två åt är det en obetald rast, och det är inget att
+ * rätta.
+ *
+ * Kortet bär EN färg, accentens gula: den lyser så länge frågan är obesvarad och
+ * slocknar när den fått sitt svar. Ingen grön kvittens — ett grönt kort är ett
+ * andra färgspråk mitt i en skärm som redan har ett, och det säger dessutom fel
+ * sak. Det som lyser upp när allt är ifyllt är den gula knappen längst ner, för
+ * det är det enda som är kvar att göra.
  */
 export function PassTiderRows({
   problems,
+  projectName,
   state,
   setStart,
   setEnd,
-  setHours,
-}: { problems: PassProblem[] } & Omit<
-  ReturnType<typeof usePassProblemRows>,
-  "unresolved"
->) {
+}: {
+  problems: PassProblem[];
+  /** Projectets namn, som frågan nämner det. */
+  projectName: string;
+} & Pick<ReturnType<typeof usePassProblemRows>, "state" | "setStart" | "setEnd">) {
   return (
     <>
       {problems.map((problem, i) => {
-        const { row, span, hours, hoursOk, agrees } = state[i];
-        const logged =
-          problem.startTime && problem.endTime
-            ? passSpanHours(problem.startTime, problem.endTime)
-            : null;
+        const { row, span, answered, halfFilled } = state[i];
 
         return (
           <div
             key={problem.shiftIds.join(",")}
             className={`glass rounded-2xl p-4 transition-colors duration-300 ease-out motion-reduce:transition-none ${
-              agrees ? "" : "!border-night-accent/45"
+              answered ? "" : "!border-night-accent/45"
             }`}
           >
             <input
@@ -123,93 +127,65 @@ export function PassTiderRows({
               value={problem.shiftIds.join(",")}
             />
 
-            <div className="mb-1 flex items-baseline justify-between gap-2">
-              <span className="text-sm font-bold tabular-nums text-white">
-                {problem.date}
-              </span>
-              <span className="text-right text-[11px] font-semibold text-white/55">
-                {problem.kind === "saknar"
-                  ? "Pass Tider saknas"
-                  : `${problem.startTime}–${problem.endTime} är ${
-                      logged === null ? "0" : formatHoursSv(logged)
-                    }h, inte ${formatHoursSv(problem.hours)}h`}
-              </span>
-            </div>
-            <p className="mb-3.5 text-xs text-white/55">
-              {problem.workers.join(", ")}
-            </p>
-
-            <div className="flex flex-col gap-3.5">
-              <label className="block">
-                <FieldLabel>Pass Timmar</FieldLabel>
-                <input
-                  name={`pass_hours_${i}`}
-                  type="number"
-                  step="any"
-                  min="0"
-                  required
-                  value={row.hours}
-                  onChange={(e) => setHours(i, e.target.value)}
-                  className={`${FIELD_BOX} tabular-nums`}
-                />
-              </label>
-
-              <div>
-                <FieldLabel>Pass Tider</FieldLabel>
-                <TimeRangeSelect
-                  start={{
-                    name: `pass_start_${i}`,
-                    label: "Pass start",
-                    value: row.start,
-                    fallback: "07:00",
-                    onChange: (value) => setStart(i, value),
-                  }}
-                  end={{
-                    name: `pass_end_${i}`,
-                    label: "Pass slut",
-                    value: row.end,
-                    fallback: "16:00",
-                    onChange: (value) => setEnd(i, value),
-                  }}
-                />
-              </div>
-
-              {/* Kvittensraden: ikonen och orden bar beskedet, fargen bara
-                  forstarker det. Nar raden gar ihop tonar den ner till samma
-                  vita som resten av kortet i stallet for att byta till en ny
-                  farg — bocken och orden ar kvittensen. */}
-              <div
-                className={`flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition-colors duration-300 ease-out motion-reduce:transition-none ${
-                  agrees
-                    ? "border border-white/12 bg-white/5"
-                    : "border border-night-accent/35 bg-night-accent/10"
-                }`}
+            {/* Frågan, med klockan i en skiva bredvid: korten ovanför i enkäten
+                bär sitt nummer i samma skiva, och de här hör till samma räcka
+                frågor även om de inte är numrerade. */}
+            <div className="mb-3 flex items-start gap-3">
+              <span
+                aria-hidden
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-night-accent text-black"
               >
-                <span
-                  className={`flex items-center gap-2 text-sm font-semibold ${
-                    agrees ? "text-white/75" : "text-night-accent"
-                  }`}
-                >
-                  {agrees ? (
-                    <Check className="h-4 w-4 shrink-0" />
-                  ) : (
-                    <Warning className="h-4 w-4 shrink-0" />
-                  )}
-                  {agrees ? "Spannet stämmer" : "Spannet"}
-                </span>
-                <span
-                  className={`text-base font-extrabold tabular-nums ${
-                    agrees ? "text-white" : "text-night-accent"
-                  }`}
-                >
-                  {span === null ? "–" : `${formatHoursSv(span)} h`}
-                </span>
+                <Clock className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-bold leading-snug text-white">
+                  Vilken tid började och slutade {joinNames(problem.workers)} den{" "}
+                  {formatWeekdayDateSv(problem.date)} på {projectName} projectet?
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-white/60">
+                  Passet är loggat som {formatHoursSv(problem.hours)} h. Timmarna
+                  ändras inte här — det är bara Pass Tider som saknas i
+                  dokumentet.
+                </p>
               </div>
+            </div>
 
-              {!agrees && hoursOk && (
+            <div>
+              <FieldLabel>Pass Tider</FieldLabel>
+              <TimeRangeSelect
+                start={{
+                  name: `pass_start_${i}`,
+                  label: "Pass start",
+                  value: row.start,
+                  fallback: "07:00",
+                  onChange: (value) => setStart(i, value),
+                }}
+                end={{
+                  name: `pass_end_${i}`,
+                  label: "Pass slut",
+                  value: row.end,
+                  fallback: "16:00",
+                  onChange: (value) => setEnd(i, value),
+                }}
+              />
+
+              {halfFilled ? (
                 <FieldHint tone="warn">
-                  Tiden mellan start och sluttid blir inte{" "}
-                  {formatHoursSv(hours)} h
+                  Välj båda klockslagen — ett halvt spann går inte att skriva ut.
+                </FieldHint>
+              ) : span !== null && Math.abs(span - problem.hours) > 0.01 ? (
+                /* Spannet är inte timmarna. Ett konstaterande och inte en
+                   invändning: så ser ett pass med obetald rast ut, och båda
+                   talen skrivs ut precis som de står. */
+                <FieldHint>
+                  Spannet blir {formatHoursSv(span)} h mot{" "}
+                  {formatHoursSv(problem.hours)} h loggade. Båda skrivs ut —
+                  mellanskillnaden är obetald rast.
+                </FieldHint>
+              ) : (
+                <FieldHint>
+                  Lämna tomt om ingen minns tiderna, så står cellen tom i
+                  dokumentet.
                 </FieldHint>
               )}
             </div>

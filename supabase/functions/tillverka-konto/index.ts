@@ -27,19 +27,36 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const SVARSHUVUDEN = {
-  "Content-Type": "application/json",
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function svar(kropp: unknown, status = 200) {
-  return new Response(JSON.stringify(kropp), { status, headers: SVARSHUVUDEN });
+// CORS, och den ENDA raden som ar vard att lasa noga ar allow-headers.
+//
+// En handskriven lista star sig inte har. supabase-js skickar inte bara
+// Authorization och Content-Type: den lagger till apikey och x-client-info
+// pa varje anrop, och webblasaren jamfor sin onskelista mot den har listan FORE
+// den skickar sjalva begaran. Saknas ett enda namn skickas ingenting alls, och
+// felet som nar appen ar inte 401 eller 500 utan "failed to send a request" --
+// funktionen ar helt oskyldig, den blev aldrig anropad.
+//
+// Darfor eko: det webblasaren ber om ar per definition det den behover, och
+// listan kan inte hamna ur takt med vad klientbiblioteket rakar skicka i nasta
+// version. Fallback for anrop utan preflight (curl, server till server).
+function huvuden(req: Request) {
+  return {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+      req.headers.get("Access-Control-Request-Headers") ??
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
 }
 
-function fel(meddelande: string, status = 400) {
-  return svar({ error: meddelande }, status);
+function svar(req: Request, kropp: unknown, status = 200) {
+  return new Response(JSON.stringify(kropp), { status, headers: huvuden(req) });
+}
+
+function fel(req: Request, meddelande: string, status = 400) {
+  return svar(req, { error: meddelande }, status);
 }
 
 type Kropp = {
@@ -51,20 +68,20 @@ type Kropp = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: SVARSHUVUDEN });
+    return new Response(null, { status: 204, headers: huvuden(req) });
   }
-  if (req.method !== "POST") return fel("Metoden stods inte", 405);
+  if (req.method !== "POST") return fel(req, "Metoden stods inte", 405);
 
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !anonKey || !serviceKey) {
-    return fel("Funktionen saknar miljovariabler", 500);
+    return fel(req, "Funktionen saknar miljovariabler", 500);
   }
 
   // --- Vakten -------------------------------------------------------------
   const authorization = req.headers.get("Authorization") ?? "";
-  if (!authorization.startsWith("Bearer ")) return fel("Inte inloggad", 401);
+  if (!authorization.startsWith("Bearer ")) return fel(req, "Inte inloggad", 401);
 
   const somAnroparen = createClient(url, anonKey, {
     global: { headers: { Authorization: authorization } },
@@ -72,25 +89,25 @@ Deno.serve(async (req) => {
   });
 
   const { data: anropare, error: anroparFel } = await somAnroparen.auth.getUser();
-  if (anroparFel || !anropare?.user) return fel("Inte inloggad", 401);
+  if (anroparFel || !anropare?.user) return fel(req, "Inte inloggad", 401);
 
   // --- Vad som begars -----------------------------------------------------
   let kropp: Kropp;
   try {
     kropp = await req.json();
   } catch {
-    return fel("Ogiltig begaran");
+    return fel(req, "Ogiltig begaran");
   }
 
   const workerId = kropp.workerId?.trim() || null;
   const email = (kropp.email ?? "").trim().toLowerCase();
   const password = kropp.password ?? "";
 
-  if (!email || !email.includes("@")) return fel("E-postadressen ar ogiltig");
+  if (!email || !email.includes("@")) return fel(req, "E-postadressen ar ogiltig");
   // Samma golv som Supabase Auth sjalv haller. Kontrollen finns har for att ge
   // ett svenskt fel i stallet for ett engelskt fran Auth.
   if (password.length < 6) {
-    return fel("Losenordet maste vara minst 6 tecken");
+    return fel(req, "Losenordet maste vara minst 6 tecken");
   }
 
   const admin = createClient(url, serviceKey, {
@@ -105,8 +122,8 @@ Deno.serve(async (req) => {
       .eq("id", workerId)
       .maybeSingle();
 
-    if (arbetarFel) return fel(`Kunde inte lasa arbetaren: ${arbetarFel.message}`, 500);
-    if (!arbetare || arbetare.deleted_at) return fel("Arbetaren finns inte");
+    if (arbetarFel) return fel(req, `Kunde inte lasa arbetaren: ${arbetarFel.message}`, 500);
+    if (!arbetare || arbetare.deleted_at) return fel(req, "Arbetaren finns inte");
 
     const befintlig = (arbetare.email ?? "").trim().toLowerCase();
 
@@ -114,7 +131,7 @@ Deno.serve(async (req) => {
       // Adressen ar inloggningen. Att skapa kontot pa en annan adress an den
       // som star pa arbetaren vore att skapa den glidning
       // assertLoginEmailUnchanged() finns for att forhindra.
-      return fel(
+      return fel(req, 
         `Arbetaren har e-posten ${arbetare.email}. Andra den pa arbetaren forst om kontot ska ha en annan adress.`
       );
     }
@@ -129,8 +146,8 @@ Deno.serve(async (req) => {
       .select("id")
       .eq("worker_id", workerId)
       .maybeSingle();
-    if (redanFel) return fel(`Kunde inte lasa konton: ${redanFel.message}`, 500);
-    if (redan) return fel("Arbetaren har redan ett konto");
+    if (redanFel) return fel(req, `Kunde inte lasa konton: ${redanFel.message}`, 500);
+    if (redan) return fel(req, "Arbetaren har redan ett konto");
 
     if (!befintlig) {
       // Arbetaren saknade adress och anvandaren fyllde i en. Den skrivs till
@@ -141,7 +158,7 @@ Deno.serve(async (req) => {
         .update({ email })
         .eq("id", workerId);
       if (sparaFel) {
-        return fel(`Kunde inte spara e-posten pa arbetaren: ${sparaFel.message}`, 500);
+        return fel(req, `Kunde inte spara e-posten pa arbetaren: ${sparaFel.message}`, 500);
       }
     }
   }
@@ -160,9 +177,9 @@ Deno.serve(async (req) => {
   if (skapaFel || !skapad?.user) {
     const m = skapaFel?.message ?? "okant fel";
     if (/already|registered|exists/i.test(m)) {
-      return fel(`Det finns redan en inloggning pa ${email}`);
+      return fel(req, `Det finns redan en inloggning pa ${email}`);
     }
-    return fel(`Kunde inte skapa inloggningen: ${m}`, 500);
+    return fel(req, `Kunde inte skapa inloggningen: ${m}`, 500);
   }
 
   // --- Kontoraden ----------------------------------------------------------
@@ -177,8 +194,8 @@ Deno.serve(async (req) => {
 
   if (kontoFel) {
     await admin.auth.admin.deleteUser(skapad.user.id);
-    return fel(`Kunde inte spara kontot: ${kontoFel.message}`, 500);
+    return fel(req, `Kunde inte spara kontot: ${kontoFel.message}`, 500);
   }
 
-  return svar({ id: skapad.user.id, email });
+  return svar(req, { id: skapad.user.id, email });
 });

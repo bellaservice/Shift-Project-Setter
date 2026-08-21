@@ -1,8 +1,18 @@
 import { supabase } from "@/lib/supabase/browser";
-import { formatPassTider, monthStartOf, passSpanHours } from "@/lib/format";
+import {
+  formatPassTider,
+  monthStartOf,
+  projectLabel,
+  shiftMonth,
+  stockholmToday,
+} from "@/lib/format";
 import type {
   ArbetsdagbokData,
   ArbetsdagbokDay,
+  Arende,
+  ArendeDetalj,
+  CalendarDay,
+  DayShift,
   HomeStats,
   KontoItem,
   KontoKandidat,
@@ -14,6 +24,7 @@ import type {
   ProjectMonthGroup,
   ProjectWithDetails,
   RecentShiftRow,
+  ShiftDetail,
   TrashItem,
   Worker,
   WorkerListItem,
@@ -27,23 +38,12 @@ import type {
  * previous one, so the count and its label would both name the wrong month.
  */
 function stockholmMonthStart(): string {
-  const today = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Europe/Stockholm",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-
-  return `${today.slice(0, 7)}-01`;
+  return monthStartOf(stockholmToday());
 }
 
 /** Exclusive upper bound for the month starting at `monthStart`. */
 function nextMonthStart(monthStart: string): string {
-  const [year, month] = monthStart.split("-").map(Number);
-  const nextYear = month === 12 ? year + 1 : year;
-  const nextMonth = month === 12 ? 1 : month + 1;
-
-  return `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+  return shiftMonth(monthStart, 1);
 }
 
 /** numeric hours folded through IEEE doubles: 0.1 + 0.2 must not reach a screen. */
@@ -502,59 +502,53 @@ export async function getArbetsdagbokData(
 }
 
 /**
- * Passen på ett project där "Pass Timmar" och "Pass Tider" inte säger samma sak,
- * som frågan innan arbetsdagboken skapas behöver dem.
+ * Passen på ett project som saknar "Pass Tider", som frågan innan
+ * arbetsdagboken skapas behöver dem.
  *
- * Två sorters trasig rad, av samma skäl: kolumnerna ska gå att läsa mot varandra
- * i det färdiga dokumentet. Antingen står Pass Tider tom — raden loggades innan
- * kolumnerna fanns — eller så står det ett spann där som inte är de timmar
- * raden skriver ut bredvid.
+ * EN sorts obesvarat pass, inte två. Fram till omskrivningen av Logga Timmar
+ * räknades även ett pass vars spann inte var dess timmar som trasigt, och
+ * enkäten spärrade dokumentet tills de två kolumnerna sa samma sak. Det kravet
+ * är borta: Pass Timmar skrivs numera för hand och Pass Tider är frivilliga, så
+ * ett åttatimmarspass med spannet 07:00–16:00 är en obetald rast och inte ett
+ * fel. Hade kontrollen stått kvar hade den frågat om varenda sådant pass och
+ * vägrat generera förrän användaren skrivit om det ena till att ljuga om det
+ * andra.
  *
- * Passen som är hela nämns inte: frågan ska vara kort, och ett project med
- * hundra korrekta pass ska gå rakt igenom till dokumentet.
+ * Kvar är den enda fråga som fortfarande går att svara på: cellen är tom, och
+ * dokumentet har ingenting att skriva i den.
+ *
+ * Passen som har sina tider nämns inte: frågan ska vara kort, och ett project
+ * med hundra kompletta pass ska gå rakt igenom till dokumentet.
  */
 export async function getPassProblems(
   projectId: string
 ): Promise<PassProblem[]> {
   const { data: shifts, error } = await supabase
     .from("shifts")
-    .select("id, worker_id, shift_date, hours, start_time, end_time, workers!inner(name, deleted_at)")
+    .select("id, worker_id, shift_date, hours, workers!inner(name, deleted_at)")
     .eq("project_id", projectId)
     .is("workers.deleted_at", null)
+    // Halva paret räcker: shifts_pass_times_paired garanterar att den andra
+    // halvan är tom också, så en rad med start_time null saknar hela spannet.
+    .is("start_time", null)
     .order("shift_date", { ascending: true });
 
   if (error) {
     throw new Error(`Kunde inte lasa passen: ${error.message}`, { cause: error });
   }
 
-  // Ett pass är de rader som delar dag, timmar och tider — det är precis vad
-  // ett tryck på "Logga Timmar" med flera arbetare valda lämnar efter sig.
+  // Ett pass är de rader som delar dag och timmar — det är precis vad ett tryck
+  // på "Logga Timmar" med flera arbetare valda lämnar efter sig, eftersom alla
+  // på passet får samma siffra.
   const byPass = new Map<string, PassProblem>();
   for (const shift of shifts ?? []) {
     const hours = Number(shift.hours);
-    const start = shift.start_time ? shift.start_time.slice(0, 5) : null;
-    const end = shift.end_time ? shift.end_time.slice(0, 5) : null;
-
-    let kind: PassProblem["kind"];
-    if (!start || !end) {
-      kind = "saknar";
-    } else {
-      const span = passSpanHours(start, end);
-      // Två decimaler är vad både spannet och en handskriven siffra behåller,
-      // så allt därifrån och neråt är avrundning och inte en avvikelse.
-      if (span !== null && Math.abs(span - hours) <= 0.01) continue;
-      kind = "stammer-ej";
-    }
-
-    const key = `${shift.shift_date}|${hours}|${start ?? ""}|${end ?? ""}`;
+    const key = `${shift.shift_date}|${hours}`;
     const pass: PassProblem = byPass.get(key) ?? {
       shiftIds: [],
       date: shift.shift_date,
       workers: [],
       hours,
-      startTime: start,
-      endTime: end,
-      kind,
     };
     pass.shiftIds.push(shift.id);
     // Supabase typar en !inner-join som en array när relationen är till-en.
@@ -567,6 +561,261 @@ export async function getPassProblems(
     ...pass,
     workers: pass.workers.sort((a, b) => a.localeCompare(b, "sv")),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Kalendern
+//
+// Tre läsningar, i den ordning man går in i dem: månaden som rutnät, en dag som
+// lista, och ett enskilt pass eller ärende som ett formulär. Varje nivå läser
+// bara det den visar — månadsrutnätet hämtar aldrig hem trettio dagars
+// arbetarnamn för att ett av dem kanske ska öppnas.
+// ---------------------------------------------------------------------------
+
+/**
+ * En månad som rutnätet ritar den: en rad per dag som faktiskt har något på sig.
+ *
+ * Halvöppet spann på arende_date respektive shift_date, precis som
+ * `getHomeStats` räknar sin månad, så ingen månadslängd behöver ett specialfall.
+ *
+ * `!inner` plus `is(..., null)` av samma skäl som överallt annars: ett pass vars
+ * project eller vars arbetare ligger i Papperskorgen syns inte i kalendern
+ * heller. Ärenden har ingen sådan koppling att förlora — ett ärende vars project
+ * raderats behåller sin dag och tappar bara sin underrubrik.
+ */
+export async function getMonthCalendar(
+  monthStart: string
+): Promise<CalendarDay[]> {
+  const monthEnd = nextMonthStart(monthStart);
+
+  const [shiftsResult, arendenResult] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select(
+        "shift_date, hours, worker_id, projects!inner(deleted_at), workers!inner(deleted_at)"
+      )
+      .is("projects.deleted_at", null)
+      .is("workers.deleted_at", null)
+      .gte("shift_date", monthStart)
+      .lt("shift_date", monthEnd),
+    // Ingen synlighetsfiltrering här: RLS-policyn arenden_select_synliga har
+    // redan gjort den, och ett filter till i JavaScript hade bara varit ett
+    // andra ställe att glömma att uppdatera. Se migrationen.
+    supabase
+      .from("arenden")
+      .select("arende_date, farg, start_time, titel")
+      .gte("arende_date", monthStart)
+      .lt("arende_date", monthEnd)
+      .order("start_time", { ascending: true, nullsFirst: true })
+      .order("titel", { ascending: true }),
+  ]);
+
+  const error = shiftsResult.error ?? arendenResult.error;
+  if (error) {
+    throw new Error(`Kunde inte lasa kalendern: ${error.message}`, { cause: error });
+  }
+
+  const rawShifts = shiftsResult.data ?? [];
+
+  // Namnen hämtas i en andra omgång, på de arbetare som faktiskt förekommer i
+  // månaden. Det är det som gör rutorna möjliga att skriva namn i utan att
+  // hämta hela rostern: en månad rör sällan mer än en handfull personer, och
+  // frågan ställs en gång för hela rutnätet i stället för en gång per dag.
+  const workerIds = [...new Set(rawShifts.map((s) => s.worker_id))];
+  const nameById = new Map<string, string>();
+  if (workerIds.length > 0) {
+    const { data: workers, error: workersError } = await supabase
+      .from("workers")
+      .select("id, name")
+      .in("id", workerIds);
+    if (workersError) {
+      throw new Error(`Kunde inte lasa arbetare: ${workersError.message}`, {
+        cause: workersError,
+      });
+    }
+    for (const w of workers ?? []) nameById.set(w.id, w.name);
+  }
+
+  const byDate = new Map<
+    string,
+    { hours: number; workers: Set<string>; farger: string[] }
+  >();
+  function cell(date: string) {
+    const existing = byDate.get(date);
+    if (existing) return existing;
+    const fresh = { hours: 0, workers: new Set<string>(), farger: [] as string[] };
+    byDate.set(date, fresh);
+    return fresh;
+  }
+
+  for (const s of rawShifts) {
+    const day = cell(s.shift_date);
+    day.hours += Number(s.hours);
+    // En mängd av NAMN och inte av id:n: två pass på samma arbetare samma dag
+    // är en person på plats, och rutan ska inte skriva ut henne två gånger.
+    day.workers.add(nameById.get(s.worker_id) ?? "Okand arbetare");
+  }
+  for (const a of arendenResult.data ?? []) {
+    cell(a.arende_date).farger.push(a.farg);
+  }
+
+  return [...byDate.entries()]
+    .map(([date, day]) => ({
+      date,
+      totalHours: roundHours(day.hours),
+      workerNames: [...day.workers].sort((a, b) => a.localeCompare(b, "sv")),
+      arendeFarger: day.farger,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * En dags innehåll, som arket under rutnätet listar det: passen per arbetare och
+ * ärendena.
+ *
+ * Arbetarnas namn slås upp i en andra omgång i stället för att joinas in, av
+ * samma skäl som `getRecentShiftsForProject` gör det: PostgREST typar en
+ * inbäddad relation som en array, vilket kostar en `as unknown as` per fält,
+ * medan ett `in`-anrop på de ids som faktiskt förekom är både typat och färre
+ * rader hem.
+ */
+export async function getDayLog(
+  date: string
+): Promise<{ shifts: DayShift[]; arenden: Arende[] }> {
+  const [shiftsResult, arendenResult] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select(
+        "id, worker_id, project_id, hours, start_time, end_time, projects!inner(deleted_at), workers!inner(deleted_at)"
+      )
+      .eq("shift_date", date)
+      .is("projects.deleted_at", null)
+      .is("workers.deleted_at", null),
+    supabase
+      .from("arenden")
+      .select("*")
+      .eq("arende_date", date)
+      // Heldagarna först, sedan i klockslagsordning: det är den ordning dagen
+      // faktiskt sker i. En heldag har inget klockslag att sorteras på, den
+      // omfattar dem alla — därav nullsFirst.
+      .order("start_time", { ascending: true, nullsFirst: true })
+      .order("titel", { ascending: true }),
+  ]);
+
+  const error = shiftsResult.error ?? arendenResult.error;
+  if (error) {
+    throw new Error(`Kunde inte lasa dagen: ${error.message}`, { cause: error });
+  }
+
+  const rawShifts = shiftsResult.data ?? [];
+  const workerIds = [...new Set(rawShifts.map((s) => s.worker_id))];
+  const projectIds = [...new Set(rawShifts.map((s) => s.project_id))];
+
+  const [workersResult, projectsResult] = await Promise.all([
+    workerIds.length > 0
+      ? supabase.from("workers").select("id, name").in("id", workerIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    projectIds.length > 0
+      ? supabase.from("projects").select("id, name, address").in("id", projectIds)
+      : Promise.resolve({
+          data: [] as { id: string; name: string | null; address: string }[],
+        }),
+  ]);
+
+  const nameById = new Map((workersResult.data ?? []).map((w) => [w.id, w.name]));
+  const projectById = new Map(
+    (projectsResult.data ?? []).map((p) => [p.id, projectLabel(p)])
+  );
+
+  const shifts: DayShift[] = rawShifts
+    .map((s) => ({
+      id: s.id,
+      workerId: s.worker_id,
+      workerName: nameById.get(s.worker_id) ?? "Okand arbetare",
+      projectId: s.project_id,
+      projectName: projectById.get(s.project_id) ?? "Okant project",
+      hours: Number(s.hours),
+      startTime: s.start_time ? s.start_time.slice(0, 5) : null,
+      endTime: s.end_time ? s.end_time.slice(0, 5) : null,
+    }))
+    // Efter namn, så dagens lista står i samma ordning som Arbetsdagbokens
+    // dagtabell gör. Id:t som tiebreak gör ordningen total, så två renderingar
+    // av samma dag aldrig byter plats på två arbetare som heter lika.
+    .sort(
+      (a, b) =>
+        a.workerName.localeCompare(b.workerName, "sv") || a.id.localeCompare(b.id)
+    );
+
+  return { shifts, arenden: (arendenResult.data ?? []) as Arende[] };
+}
+
+/** Ett pass, för sin redigeringsskärm. Null när id:t är okänt — eller när
+ *  passets project eller arbetare hunnit hamna i Papperskorgen. */
+export async function getShiftDetail(id: string): Promise<ShiftDetail | null> {
+  const { data, error } = await supabase
+    .from("shifts")
+    .select(
+      "id, shift_date, project_id, worker_id, hours, start_time, end_time, projects!inner(deleted_at), workers!inner(name, deleted_at)"
+    )
+    .eq("id", id)
+    .is("projects.deleted_at", null)
+    .is("workers.deleted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Kunde inte lasa passet: ${error.message}`, { cause: error });
+  }
+  if (!data) return null;
+
+  const worker = data.workers as unknown as { name: string } | null;
+
+  return {
+    id: data.id,
+    shiftDate: data.shift_date,
+    projectId: data.project_id,
+    workerId: data.worker_id,
+    workerName: worker?.name ?? "Okand arbetare",
+    hours: Number(data.hours),
+    startTime: data.start_time ? data.start_time.slice(0, 5) : null,
+    endTime: data.end_time ? data.end_time.slice(0, 5) : null,
+  };
+}
+
+/**
+ * Ett ärende med de konton det visas för, för sitt formulär.
+ *
+ * Null när id:t är okänt — eller när ärendet finns men inte får ses av den som
+ * frågar. De två går inte att skilja åt härifrån, och det är rätt: RLS svarar
+ * med noll rader i båda fallen, och skärmen ska inte kunna användas för att
+ * bekräfta att någon annans privata ärende existerar.
+ */
+export async function getArende(id: string): Promise<ArendeDetalj | null> {
+  const { data, error } = await supabase
+    .from("arenden")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Kunde inte lasa arendet: ${error.message}`, { cause: error });
+  }
+  if (!data) return null;
+
+  const { data: tittare, error: tittareError } = await supabase
+    .from("arende_tittare")
+    .select("konto_id")
+    .eq("arende_id", id);
+
+  if (tittareError) {
+    throw new Error(`Kunde inte lasa arendets konton: ${tittareError.message}`, {
+      cause: tittareError,
+    });
+  }
+
+  return {
+    ...(data as Arende),
+    tittare: (tittare ?? []).map((t) => t.konto_id as string),
+  };
 }
 
 // ---------------------------------------------------------------------------

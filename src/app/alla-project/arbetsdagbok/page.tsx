@@ -160,6 +160,7 @@ function ArbetsdagbokScreen() {
             ) : (
               <ArbetsdagbokSurvey
                 projectId={id}
+                projectName={loaded.data.projectName}
                 questions={missingQuestions(loaded.data)}
                 passProblems={loaded.passProblems}
               />

@@ -143,6 +143,14 @@ const DOCUMENT_CSS = `
      krymper även layoutrutan; en transform hade lämnat kvar 794px tomrum.
      Trappa i stället för calc(): CSS kan inte dela längd med längd, så det går
      inte att räkna fram förhållandet 100vw / 794px. */
+  /* Trappans översta steg, och det enda som inte handlar om telefoner: mellan
+     859px och 948px fönsterbredd är arket i full skala (210mm ≈ 794px) bredare
+     än vad appskalets centrerade 672px-kolumn har kvar fram till högerkanten,
+     så hela SIDAN svämmar över i sidled — inte bara kolumnen. 0,80 ger 635px,
+     vilket ryms i kolumnens 640px innehållsbredd vid varje fönsterbredd över
+     858px. Utan steget klipper overflow-x: hidden i globals.css bort arkets
+     högerkant i stället för att visa den. */
+  @media (max-width: 948px) { .ad-viewport { zoom: 0.80; } }
   @media (max-width: 858px) { .ad-viewport { zoom: 0.82; } }
   @media (max-width: 700px) { .ad-viewport { zoom: 0.66; } }
   @media (max-width: 560px) { .ad-viewport { zoom: 0.52; } }

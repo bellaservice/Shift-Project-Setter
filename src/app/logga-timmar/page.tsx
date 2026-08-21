@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { PanelSkeleton, Query } from "@/components/Query";
 import { RecentShiftsList } from "@/components/RecentShiftsList";
 import { Screen, SectionHeading } from "@/components/Screen";
+import { parseIsoDate } from "@/lib/format";
 import { getProjects, getRecentShiftsForProject, getWorkers } from "@/lib/queries";
 import { useQuery } from "@/lib/useQuery";
 import { LoggaTimmarForm } from "./LoggaTimmarForm";
@@ -15,6 +16,10 @@ import { LoggaTimmarForm } from "./LoggaTimmarForm";
  * `?project=` valjer vilket project passet hor till, och den parametern kommer
  * fran adressfaltet snarare an fran filen — darav <Suspense>-gransen. Se
  * noteringen i /logga-project/page.tsx; ramen ar statisk, innehallet vantar.
+ *
+ * Kalendern skickar tva parametrar till: `?datum=` ar dagen man tryckte pa, och
+ * `?retur=` ar vagen tillbaka till den. Skarmen ar i ovrigt precis densamma
+ * oavsett var man kom ifran — en forifylld dag ar allt som skiljer.
  */
 export default function LoggaTimmarPage() {
   return (
@@ -32,7 +37,13 @@ export default function LoggaTimmarPage() {
 }
 
 function TimmarContent() {
-  const selectedProjectId = useSearchParams().get("project") ?? "";
+  const params = useSearchParams();
+  const selectedProjectId = params.get("project") ?? "";
+  // Genom `parseIsoDate`, inte rakt in i faltet: query-strangen ar en egenskap
+  // hos besoket och kan innehalla vad som helst, och "2026-13-99" ska bli
+  // dagens datum snarare an ett datumfalt som star pa en manad som inte finns.
+  const defaultDate = parseIsoDate(params.get("datum")) ?? undefined;
+  const returnTo = params.get("retur") ?? undefined;
 
   // Ett anrop, inte tre hooks. Historiken beror pa vilket project som ar valt,
   // sa den maste las om nar valet andras — och `selectedProjectId` i beroende-
@@ -57,6 +68,8 @@ function TimmarContent() {
             projects={projects}
             workers={workers}
             selectedProjectId={selectedProjectId}
+            defaultDate={defaultDate}
+            returnTo={returnTo}
           />
 
           {/* Historiken dyker upp forst nar ett project ar valt, och da direkt
