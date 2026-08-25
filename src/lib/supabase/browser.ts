@@ -55,3 +55,25 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
     return Reflect.get(getSupabase(), prop, receiver);
   },
 });
+
+/**
+ * Force a token refresh, swallowing whatever comes back.
+ *
+ * `useQuery` calls this between two attempts at the same read, and only when
+ * the first attempt failed in a way that smells of the JWT rather than of the
+ * query. supabase-js already refreshes an expired token underneath every
+ * request, so this is not the normal path — it is the recovery path for the
+ * case where the token the request went out with was accepted by the client
+ * and rejected by PostgREST anyway.
+ *
+ * Failures are deliberately ignored. A refresh that does not work leaves the
+ * session exactly as it was, and the caller is about to retry regardless; the
+ * retry's own error is the one worth showing, not this one.
+ */
+export async function refreshSession(): Promise<void> {
+  try {
+    await getSupabase().auth.refreshSession();
+  } catch {
+    // See above: the retry reports for itself.
+  }
+}
