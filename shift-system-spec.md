@@ -264,7 +264,11 @@ The X control in the confirmation row confirms the shift at **zero hours** rathe
 
 ### 8.7 Resolved 2026-08-27 — changing a role, and the lockout that guards it
 
-**The screen.** `Installningar > Konto` gained a role switch per account: two buttons, the current role marked and disabled. Disabled rather than merely marked, because pressing the role an account already holds would be a write that changes nothing — and the screen would then report a success that never happened. The list is leader-only; an arbetare reaching it is turned away, and `accounts_update_arbetsledare` refuses their write regardless.
+**The screen.** `Installningar > Konto` gained a role switch per account — one segmented control, not two buttons. An amber plate sits over the role the account holds and slides across when the role changes; that movement is the confirmation, so there is nothing to save and nothing to dismiss. Two buttons side by side would have said "here are two things to do"; a switch with a marked position says "the account is this, and it can be moved", which is what is true.
+
+The held half is disabled, because pressing the role an account already holds would be a write that changes nothing while the screen reported a success that never happened. It reads as selected rather than greyed out, since it is the lit half.
+
+One form with two submit buttons carrying `name="roll"`, rather than two forms: a submit button contributes its own value to the form data, so the whole switch is a single submission and `konto_id` appears once. The list is leader-only; an arbetare reaching it is turned away, and `accounts_update_arbetsledare` refuses their write regardless.
 
 Setting a role at *creation* time is not included. Accounts are minted through an Edge Function holding the service-role key, which is a separate deployment path; new accounts therefore still default to `arbetare` and are promoted afterwards. Deferred deliberately.
 

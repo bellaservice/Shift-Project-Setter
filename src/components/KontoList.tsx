@@ -74,14 +74,22 @@ const ROLLER: { value: Roll; label: string }[] = [
 ];
 
 /**
- * Rollvaxeln: tva knappar, den gallande markerad och avstangd.
+ * Rollvaxeln: EN kontroll med tva lagen, inte tva knappar bredvid varandra.
  *
- * Avstangd och inte bara markerad, for att ett tryck pa den roll kontot redan
- * har vore en skrivning som inte andrar nagot — och skarmen hade da rapporterat
- * en lyckad andring som inte var en.
+ * Skillnaden ar inte kosmetisk. Tva likadana knappar sager "har finns tva
+ * saker att gora"; en vaxel med ett markerat lage sager "kontot ar det har, och
+ * det gar att flytta" — vilket ar sant. Den gallande rollen bar den gula
+ * plattan, den andra halvan ar bara text, och plattan glider over nar rollen
+ * byts. Att den ROR sig ar sjalva beskedet om att nagot hant.
  *
- * Tva knappar och ingen dropdown: det ar tva alternativ, och en meny man maste
- * oppna for att se tva rader ar en meny for mycket. Bada nar 44px.
+ * Ett formular och tva submit-knappar, inte tva formular: en submit-knapp med
+ * `name` och `value` skickar med sitt eget varde i formData, sa hela vaxeln ar
+ * en enda inlamning och `konto_id` behover bara sta en gang.
+ *
+ * Den gallande halvan ar avstangd. Ett tryck pa den roll kontot redan har vore
+ * en skrivning som inte andrar nagot, och skarmen hade rapporterat en lyckad
+ * andring som aldrig skedde. Avstangd syns inte som gragjord har — halvan ar
+ * ju den upplysta — utan bara som att det inte hander nagot.
  */
 function RollVaxel({
   konto,
@@ -94,31 +102,52 @@ function RollVaxel({
 }) {
   // Okand roll behandlas som arbetare, samma hallning som overallt annars.
   const gallande: Roll = konto.roll ?? "arbetare";
+  const arLedare = gallande === "arbetsledare";
 
   return (
-    <div className="mt-2.5 flex gap-2">
-      {ROLLER.map((roll) => {
-        const vald = roll.value === gallande;
-        return (
-          <form key={roll.value} action={onRollByte} className="flex-1">
-            <input type="hidden" name="konto_id" value={konto.id} />
-            <input type="hidden" name="roll" value={roll.value} />
+    <form action={onRollByte} className="mt-2.5">
+      <input type="hidden" name="konto_id" value={konto.id} />
+
+      <div
+        role="group"
+        aria-label={`Roll for ${konto.namn}`}
+        className="relative grid grid-cols-2 rounded-xl bg-white/8 p-1"
+      >
+        {/* Plattan. `w-[calc(50%-4px)]` ar exakt en halva av innermatten
+            (p-1 = 4px pa varje sida), sa `translate-x-full` flyttar den precis
+            en halva — fran vanster segments kant till hogers. Ingen gissad
+            pixel, och den foljer med nar raden byter bredd. */}
+        <span
+          aria-hidden
+          className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-lg bg-night-accent shadow-[0_2px_10px_-2px_rgba(255,185,46,0.6)] transition-transform duration-300 ease-out motion-reduce:transition-none ${
+            arLedare ? "translate-x-0" : "translate-x-full"
+          }`}
+        />
+
+        {ROLLER.map((roll) => {
+          const vald = roll.value === gallande;
+          return (
             <button
+              key={roll.value}
               type="submit"
+              name="roll"
+              value={roll.value}
               disabled={pending || vald}
               aria-pressed={vald}
-              className={`h-11 w-full rounded-xl text-sm font-bold transition-colors duration-200 ease-out motion-reduce:transition-none ${
+              /* z-10: texten ligger OVANFOR plattan, sa den valda etiketten
+                 blir svart mot gult i stallet for att gomma sig under den. */
+              className={`relative z-10 h-10 rounded-lg text-sm font-bold transition-colors duration-200 ease-out motion-reduce:transition-none ${
                 vald
-                  ? "bg-night-accent text-black"
-                  : "glass text-white/80 active:bg-white/20 disabled:opacity-45"
+                  ? "text-black"
+                  : "text-white/70 active:text-white disabled:opacity-45"
               }`}
             >
               {roll.label}
             </button>
-          </form>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </form>
   );
 }
 

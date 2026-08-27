@@ -203,9 +203,24 @@ hen efteråt, med rollväxeln nedan.
 
 ### Byta roll
 
-Varje rad i kontolistan har två knappar — **Arbetsledare** och **Arbetare**. Den
-roll kontot har är markerad i gult och går inte att trycka på; tryck på den
-andra så byter kontot roll direkt.
+Varje rad i kontolistan har en **växel** med två lägen:
+
+```
+┌─────────────────────────────────────┐
+│ ███ Arbetsledare ███ │   Arbetare   │   ← kontot är arbetsledare
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│    Arbetsledare      │ ███ Arbetare ███ │   ← kontot är arbetare
+└─────────────────────────────────────┘
+```
+
+Den gula plattan sitter på den roll kontot har. Tryck på den andra halvan, så
+glider plattan över och rollen är bytt. Det finns inget att spara och ingen
+bekräftelse att klicka bort — att plattan flyttar sig *är* kvittot.
+
+Halvan som redan är vald går inte att trycka på. Det är med flit: att "byta"
+till den roll kontot redan har vore ingen ändring alls.
 
 Byter någon roll slår det igenom nästa gång hen laddar appen. En arbetare som
 just blivit arbetsledare ser Skapa Pass och Bekrafta Pass i menyn, och tappar
