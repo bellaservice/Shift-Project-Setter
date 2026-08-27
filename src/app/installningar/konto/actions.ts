@@ -65,6 +65,34 @@ export async function satsRoll(formData: FormData): Promise<void> {
   }
 
   if ((data ?? []).length === 0) {
+    /**
+     * Noll rader betyder tva helt olika saker, och att blanda ihop dem kostade
+     * en riktig anvandare en kvart:
+     *
+     *   a) Raden matchade inte — kontot hade redan rollen, eller nagon annan
+     *      hann fore. Ofarligt, ladda om.
+     *   b) RLS slappte inte fram skrivningen. Da traffar UPDATE noll rader UTAN
+     *      att fela, precis som i (a) — men orsaken ar att den inloggade inte
+     *      langre ar arbetsledare. Det hander framfor allt efter att nagon
+     *      degraderat sitt EGET konto: darefter far hen inte satta tillbaka
+     *      rollen heller, och "kontot kan redan ha den rollen" var da ett rent
+     *      vilseledande besked.
+     *
+     * En extra lasning skiljer dem at. Star raden kvar pa sin gamla roll var
+     * det (b).
+     */
+    const { data: rad } = await supabase
+      .from("accounts")
+      .select("role")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (rad && rad.role !== nyRoll) {
+      throw new Error(
+        "Du har inte behorighet att andra roller. Det beror oftast pa att ditt eget konto inte langre ar arbetsledare — ladda om sidan, och be en kollega satta tillbaka rollen om den ar borta."
+      );
+    }
+
     throw new Error(
       "Rollen andrades inte. Kontot kan redan ha den rollen, eller ha andrats av nagon annan — ladda om sidan."
     );

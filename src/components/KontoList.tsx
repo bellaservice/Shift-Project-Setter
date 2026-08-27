@@ -26,10 +26,13 @@ import type { KontoItem, Roll } from "@/lib/types";
  */
 export function KontoList({
   konton,
+  egetKontoId,
   onRollByte,
   pending = false,
 }: {
   konton: KontoItem[];
+  /** Den inloggades eget konto-id, sa raden kan sparra egen degradering. */
+  egetKontoId?: string | null;
   /**
    * Utelamnas den ar listan bara att lasa — precis som forr. Skickas den med
    * far varje rad en rollvaxel.
@@ -58,6 +61,7 @@ export function KontoList({
           <KontoRad
             key={konto.id}
             konto={konto}
+            egetKonto={konto.id === egetKontoId}
             onRollByte={onRollByte}
             pending={pending}
           />
@@ -93,16 +97,34 @@ const ROLLER: { value: Roll; label: string }[] = [
  */
 function RollVaxel({
   konto,
+  egetKonto,
   onRollByte,
   pending,
 }: {
   konto: KontoItem;
+  /** Ar det har radens konto den inloggades eget? */
+  egetKonto: boolean;
   onRollByte: (formData: FormData) => void;
   pending: boolean;
 }) {
   // Okand roll behandlas som arbetare, samma hallning som overallt annars.
   const gallande: Roll = konto.roll ?? "arbetare";
   const arLedare = gallande === "arbetsledare";
+
+  /**
+   * Att degradera SIG SJALV ar sparrat.
+   *
+   * Inte av forsiktighet utan for att det ar en atervandsgrand: i samma stund
+   * rollen ar borta far man inte langre skriva i public.accounts, och alltsa
+   * inte heller ta tillbaka den. Man blir sittande med vaxeln framfor sig och
+   * kan inte rora den. Det hande pa riktigt innan den har sparren fanns.
+   *
+   * Databasen tillater det fortfarande — dar ar bara den SISTA arbetsledaren
+   * skyddad — sa det har ar en grind mot ett anvandarmisstag, inte mot
+   * missbruk. Den som verkligen vill kliva av ber en kollega gora det, vilket
+   * ocksa ar den enda vagen som lamnar nagon kvar som kan angra sig.
+   */
+  const kanIntaDegraderaSigSjalv = egetKonto && arLedare;
 
   return (
     <form action={onRollByte} className="mt-2.5">
@@ -126,14 +148,21 @@ function RollVaxel({
 
         {ROLLER.map((roll) => {
           const vald = roll.value === gallande;
+          // Egen degradering: halvan "Arbetare" ar stangd pa sin egen rad.
+          const sparrad = kanIntaDegraderaSigSjalv && roll.value === "arbetare";
           return (
             <button
               key={roll.value}
               type="submit"
               name="roll"
               value={roll.value}
-              disabled={pending || vald}
+              disabled={pending || vald || sparrad}
               aria-pressed={vald}
+              title={
+                sparrad
+                  ? "Du kan inte ta bort din egen arbetsledarroll — be en kollega gora det."
+                  : undefined
+              }
               /* z-10: texten ligger OVANFOR plattan, sa den valda etiketten
                  blir svart mot gult i stallet for att gomma sig under den. */
               className={`relative z-10 h-10 rounded-lg text-sm font-bold transition-colors duration-200 ease-out motion-reduce:transition-none ${
@@ -153,10 +182,12 @@ function RollVaxel({
 
 function KontoRad({
   konto,
+  egetKonto,
   onRollByte,
   pending,
 }: {
   konto: KontoItem;
+  egetKonto: boolean;
   onRollByte?: (formData: FormData) => void;
   pending: boolean;
 }) {
@@ -184,7 +215,21 @@ function KontoRad({
       </div>
 
       {onRollByte && (
-        <RollVaxel konto={konto} onRollByte={onRollByte} pending={pending} />
+        <>
+          <RollVaxel
+            konto={konto}
+            egetKonto={egetKonto}
+            onRollByte={onRollByte}
+            pending={pending}
+          />
+          {egetKonto && (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-white/55">
+              Det har ar ditt eget konto. Du kan inte ta bort din egen
+              arbetsledarroll — da skulle du inte langre fa satta tillbaka den.
+              Be en kollega gora det.
+            </p>
+          )}
+        </>
       )}
     </div>
   );

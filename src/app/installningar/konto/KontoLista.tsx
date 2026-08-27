@@ -26,7 +26,7 @@ import { satsRoll } from "./actions";
  * databasens tva vakter finns.
  */
 export function KontoLista() {
-  const { roll, rollLoading } = useAuth();
+  const { roll, rollLoading, session } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -74,6 +74,7 @@ export function KontoLista() {
         {(data) => (
           <KontoList
             konton={data}
+            egetKontoId={session?.user.id ?? null}
             onRollByte={byteAvRoll}
             pending={pending}
           />
