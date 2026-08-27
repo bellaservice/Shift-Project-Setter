@@ -1,7 +1,9 @@
+"use client";
+
 import { User } from "@/components/Icons";
 import { EmptyState } from "@/components/Screen";
 import { KONTO_STATUS } from "@/lib/konton";
-import type { KontoItem } from "@/lib/types";
+import type { KontoItem, Roll } from "@/lib/types";
 
 /**
  * Vilka som kan logga in, och vad de har for status. Bara att lasa.
@@ -22,7 +24,24 @@ import type { KontoItem } from "@/lib/types";
  * oppna men inte spara ar varre an ingen dropdown: den ser ut som ett val, och
  * det ar den inte langre.
  */
-export function KontoList({ konton }: { konton: KontoItem[] }) {
+export function KontoList({
+  konton,
+  onRollByte,
+  pending = false,
+}: {
+  konton: KontoItem[];
+  /**
+   * Utelamnas den ar listan bara att lasa — precis som forr. Skickas den med
+   * far varje rad en rollvaxel.
+   *
+   * En prop och inte ett internt rollkall: den som INTE ar arbetsledare ska
+   * inte se kontrollen alls, och den som anropar vet det redan. Att gomma
+   * kontrollen ar dock artighet — accounts_update_arbetsledare avvisar en
+   * arbetares skrivning oavsett vad skarmen visar.
+   */
+  onRollByte?: (formData: FormData) => void;
+  pending?: boolean;
+}) {
   if (konton.length === 0) {
     return (
       <EmptyState
@@ -36,14 +55,82 @@ export function KontoList({ konton }: { konton: KontoItem[] }) {
     <div className="glass rounded-2xl">
       <div className="divide-y divide-night-line">
         {konton.map((konto) => (
-          <KontoRad key={konto.id} konto={konto} />
+          <KontoRad
+            key={konto.id}
+            konto={konto}
+            onRollByte={onRollByte}
+            pending={pending}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function KontoRad({ konto }: { konto: KontoItem }) {
+/** De tva rollerna, i den ordning de star i vaxeln. */
+const ROLLER: { value: Roll; label: string }[] = [
+  { value: "arbetsledare", label: "Arbetsledare" },
+  { value: "arbetare", label: "Arbetare" },
+];
+
+/**
+ * Rollvaxeln: tva knappar, den gallande markerad och avstangd.
+ *
+ * Avstangd och inte bara markerad, for att ett tryck pa den roll kontot redan
+ * har vore en skrivning som inte andrar nagot — och skarmen hade da rapporterat
+ * en lyckad andring som inte var en.
+ *
+ * Tva knappar och ingen dropdown: det ar tva alternativ, och en meny man maste
+ * oppna for att se tva rader ar en meny for mycket. Bada nar 44px.
+ */
+function RollVaxel({
+  konto,
+  onRollByte,
+  pending,
+}: {
+  konto: KontoItem;
+  onRollByte: (formData: FormData) => void;
+  pending: boolean;
+}) {
+  // Okand roll behandlas som arbetare, samma hallning som overallt annars.
+  const gallande: Roll = konto.roll ?? "arbetare";
+
+  return (
+    <div className="mt-2.5 flex gap-2">
+      {ROLLER.map((roll) => {
+        const vald = roll.value === gallande;
+        return (
+          <form key={roll.value} action={onRollByte} className="flex-1">
+            <input type="hidden" name="konto_id" value={konto.id} />
+            <input type="hidden" name="roll" value={roll.value} />
+            <button
+              type="submit"
+              disabled={pending || vald}
+              aria-pressed={vald}
+              className={`h-11 w-full rounded-xl text-sm font-bold transition-colors duration-200 ease-out motion-reduce:transition-none ${
+                vald
+                  ? "bg-night-accent text-black"
+                  : "glass text-white/80 active:bg-white/20 disabled:opacity-45"
+              }`}
+            >
+              {roll.label}
+            </button>
+          </form>
+        );
+      })}
+    </div>
+  );
+}
+
+function KontoRad({
+  konto,
+  onRollByte,
+  pending,
+}: {
+  konto: KontoItem;
+  onRollByte?: (formData: FormData) => void;
+  pending: boolean;
+}) {
   // Ett konto utan arbetare heter sin adress, sa att upprepa adressen pa
   // underraden vore att skriva samma sak tva ganger. Underraden sager i stallet
   // vad raden ar, vilket ar den enda uppgift som skiljer den fran de andra.
@@ -51,19 +138,25 @@ function KontoRad({ konto }: { konto: KontoItem }) {
     KONTO_STATUS.find((s) => s.value === konto.status)?.label ?? konto.status;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5">
-      <Avatar bild={konto.bild} />
+    <div className="px-4 py-3.5">
+      <div className="flex items-center gap-3">
+        <Avatar bild={konto.bild} />
 
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] font-bold text-white">
-          {konto.namn}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-bold text-white">
+            {konto.namn}
+          </div>
+          <div className="truncate text-xs text-white/60">
+            {konto.kopplad ? konto.epost : "Utan arbetare"}
+          </div>
         </div>
-        <div className="truncate text-xs text-white/60">
-          {konto.kopplad ? konto.epost : "Utan arbetare"}
-        </div>
+
+        <StatusBricka status={status} aktiv={konto.status === "aktiv"} />
       </div>
 
-      <StatusBricka status={status} aktiv={konto.status === "aktiv"} />
+      {onRollByte && (
+        <RollVaxel konto={konto} onRollByte={onRollByte} pending={pending} />
+      )}
     </div>
   );
 }

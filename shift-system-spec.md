@@ -262,6 +262,26 @@ The X control in the confirmation row confirms the shift at **zero hours** rathe
 
 ⚠️ Note the consequence: a no-show becomes a confirmed 0-hour row, and the Workday Diary will print it as `0`. Whether the document should instead omit or annotate such rows is not settled here.
 
+### 8.7 Resolved 2026-08-27 — changing a role, and the lockout that guards it
+
+**The screen.** `Installningar > Konto` gained a role switch per account: two buttons, the current role marked and disabled. Disabled rather than merely marked, because pressing the role an account already holds would be a write that changes nothing — and the screen would then report a success that never happened. The list is leader-only; an arbetare reaching it is turned away, and `accounts_update_arbetsledare` refuses their write regardless.
+
+Setting a role at *creation* time is not included. Accounts are minted through an Edge Function holding the service-role key, which is a separate deployment path; new accounts therefore still default to `arbetare` and are promoted afterwards. Deferred deliberately.
+
+**⚠️ The lockout this opens, and the guard that closes it.** A role switch is the one control that can lock the company out of its own system: the last active arbetsledare demotes themselves, and from that moment nobody may write to `public.accounts` — because promotion requires exactly the role that just disappeared. It is unrecoverable from inside the app and needs direct database access to repair.
+
+`kit.accounts_behall_en_arbetsledare()` (`before update or delete` on `accounts`) refuses any change that would leave zero active arbetsledare. It closes three routes into the same ditch, not one:
+
+| Route | Why it counts |
+|---|---|
+| `role` → `arbetare` | the obvious one |
+| `status` → `pausad` / `avstangd` | `kit.ar_arbetsledare()` requires *both* role and active status, so a paused leader is exactly as powerless as a demoted one |
+| the row is deleted | including via the `auth.users` cascade |
+
+Promotion is never blocked — the guard only looks at accounts *leaving* the set. `SECURITY DEFINER`, so it counts every account and not merely those the caller's own policies reveal; otherwise an invisible colleague would make a safe change look like the last one.
+
+The check lives in the database, not the button, for the same reason as the rest of the role work: the browser holds its own JWT and can call PostgREST directly. A React-side check is one you can walk around, and this is far too expensive to walk around by accident.
+
 ### 8.6 Partly resolved 2026-08-27 — scheduling (`/skapa-pass`)
 
 **What was built.** A leader screen that creates shifts in advance: date, project, one or more named workers, and optional planned Pass Tider. Rows are written `status='open'`, `hours` null, no clock stamps — the "scheduled, not started" state of 8.4c. This is what makes clocking usable at all; before it, `/stampla` could only ever be empty, because Logga Timmar writes finished `confirmed` rows.

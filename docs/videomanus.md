@@ -117,7 +117,7 @@ förtroende än den ger:
 
 - att arbetare tackar ja eller nej till tilldelade pass (Fas 2)
 - Fastanställd, förvalda dagar, "kan inte jobba", Priolista
-- att byta roll på ett konto inifrån appen
+- att sätta roll redan när kontot skapas (den sätts efteråt, med rollväxeln)
 
 ⚠️ **Film 1 måste spelas om.** Skärmen **Skapa Pass** finns nu (2026-08-27), så
 filmen kan inte längre öppna med ett pass som bara ligger där — den behöver

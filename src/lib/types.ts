@@ -218,6 +218,9 @@ export type TrashItem = {
 /** aktiv | pausad | avstangd — se supabase/migrations/20260820120000_konton.sql. */
 export type KontoStatus = "aktiv" | "pausad" | "avstangd";
 
+/** Approllen, som `accounts_role_check` stavar den. Speglar `Roll` i lib/auth. */
+export type Roll = "arbetsledare" | "arbetare";
+
 /**
  * En rad i kontolistan: inloggningen och personen den ar, i ett.
  *
@@ -240,6 +243,14 @@ export type KontoItem = {
   epost: string;
   bild: string | null;
   status: KontoStatus;
+  /**
+   * Approllen. Avgor vad kontot far gora, och andras pa kontoskarmen.
+   *
+   * `null` for en inloggning vars accounts-rad bar ett varde appen inte kanner
+   * igen. Behandlas som `arbetare` overallt — faller man ur det kanda ska man
+   * fa mindre, inte mer.
+   */
+  roll: Roll | null;
   /** Om kontot hor till en arbetare i rostern. */
   kopplad: boolean;
   /** ISO-datum. Bara radens undertext; ingen logik hanger pa den. */

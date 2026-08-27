@@ -26,6 +26,7 @@ import type {
   ProjectMonthGroup,
   ProjectWithDetails,
   RecentShiftRow,
+  Roll,
   ShiftDetail,
   StamplaPass,
   TrashItem,
@@ -1010,7 +1011,7 @@ export async function getKonton(): Promise<KontoItem[]> {
     // ingen rad att joina mot, och ett inner join hade tystat bort det ur
     // listan i stallet for att visa det.
     .select(
-      "id, worker_id, status, created_at, email, workers(name, email, profile_picture_url)"
+      "id, worker_id, status, role, created_at, email, workers(name, email, profile_picture_url)"
     )
     .order("created_at", { ascending: true });
 
@@ -1038,6 +1039,12 @@ export async function getKonton(): Promise<KontoItem[]> {
       epost,
       bild: kopplad ? w.profile_picture_url : null,
       status: a.status as KontoStatus,
+      // Okand roll blir null, aldrig en gissning: en rad ska inte kunna se mer
+      // privilegierad ut an den ar.
+      roll:
+        a.role === "arbetsledare" || a.role === "arbetare"
+          ? (a.role as Roll)
+          : null,
       kopplad,
       skapad: String(a.created_at).slice(0, 10),
     };

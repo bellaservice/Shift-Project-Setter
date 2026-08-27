@@ -198,12 +198,34 @@ En arbetare behöver ett konto för att kunna stämpla. Kontot kräver en
 e-postadress — adressen *är* inloggningen.
 
 ⚠️ **Nya konton blir arbetare.** Det är med flit: en inloggning ska aldrig födas
-med fler befogenheter än den behöver. Ska någon vara arbetsledare måste rollen
-sättas medvetet.
+med fler befogenheter än den behöver. Ska någon vara arbetsledare befordrar du
+hen efteråt, med rollväxeln nedan.
 
-⚠️ **Rollen går i dag inte att ändra i appen.** Kolumnen finns i databasen men
-har ingen knapp än. Behöver du befordra någon får det göras direkt i databasen
-tills den skärmen finns — se [Det som inte finns än](#det-som-inte-finns-än).
+### Byta roll
+
+Varje rad i kontolistan har två knappar — **Arbetsledare** och **Arbetare**. Den
+roll kontot har är markerad i gult och går inte att trycka på; tryck på den
+andra så byter kontot roll direkt.
+
+Byter någon roll slår det igenom nästa gång hen laddar appen. En arbetare som
+just blivit arbetsledare ser Skapa Pass och Bekrafta Pass i menyn, och tappar
+Stampla — hen har inga egna pass längre om kontot saknar arbetare.
+
+### Den sista arbetsledaren går inte att degradera
+
+Försöker du får du:
+
+> *Det måste finnas minst en aktiv arbetsledare. Utse en annan först — annars
+> kan ingen längre ändra roller, och appen går bara att laga i databasen.*
+
+Det är inte en försiktighetsåtgärd utan en spärr, och den finns för att felet
+annars vore oreparerbart inifrån appen: rollen som får ändra roller vore borta,
+och ingen kvar skulle kunna dela ut den igen. Detsamma gäller om du försöker
+pausa, stänga av eller radera den sista arbetsledaren — ett pausat konto har
+inga befogenheter, så det räknas som att rollen försvunnit.
+
+**Utse efterträdaren först, degradera sedan dig själv.** I den ordningen släpper
+spärren.
 
 Ett konto utan arbetare — kontoret, ekonomin — fungerar utmärkt. Det har bara
 inga egna pass att stämpla på, och **Stampla** säger det rakt ut i stället för
@@ -243,5 +265,5 @@ Så att du inte letar efter något som inte är byggt:
 |---|---|
 | **Arbetarnas bekräfta/neka av tilldelade pass** (spec Fas 2) | Ingen accept/neka-funktion finns. |
 | **Fastanställd, förval av dagar, "kan inte jobba", Priolista** (spec Avsnitt 4) | Ingen automatisk tillsättning av pass. |
-| **Knapp för att byta roll på ett konto** | Roller sätts i databasen. |
+| **Roll redan när kontot skapas** | Nya konton blir arbetare; befordra efteråt med rollväxeln i avsnitt 6. |
 | **"Sen" påverkar Priolistan** | Kryssrutan låser upp tidsjusteringen, men någon Priolista att flytta någon i finns inte än. |
