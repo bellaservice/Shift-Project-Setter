@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronRight } from "@/components/Icons";
+import { useAuth } from "@/lib/auth";
 
 /**
  * The four destinations the menu offers. Deliberately not every screen in the
@@ -20,11 +21,26 @@ import { ChevronRight } from "@/components/Icons";
  * Papperskorgen is deliberately NOT here — it lives behind the cog on the right
  * (SettingsMenu). This menu is the work you are doing; that one is the app.
  */
-const NAV = [
+/**
+ * `bara` staller raden under en roll. Utelamnad = alla ser den.
+ *
+ * ⚠️ Att gomma en rad ar artighet, inte sakerhet. Adressen gar att skriva i
+ * falten anda, och webblasaren kan tala med PostgREST utan att ga via nagon av
+ * de har lankarna. Det som faktiskt haller ar RLS och
+ * kit.shifts_guard_leader_columns(). Se kommentaren i src/lib/auth.tsx.
+ */
+const NAV: { href: string; label: string; bara?: "arbetsledare" | "arbetare" }[] = [
   { href: "/", label: "Hem" },
   { href: "/kalender", label: "Kalender" },
+  // Arbetarens enda handling i appen, och darfor hogt upp: den som ska stampla
+  // in star oftast i en port med telefonen i ena handen.
+  { href: "/stampla", label: "Stampla", bara: "arbetare" },
+  { href: "/skapa-pass", label: "Skapa Pass", bara: "arbetsledare" },
+  { href: "/bekrafta", label: "Bekrafta Pass", bara: "arbetsledare" },
   { href: "/alla-project", label: "Alla Project" },
-  { href: "/alla-arbetare", label: "Alla Arbetare" },
+  // Rostern med personnummer och kontonummer. En arbetare ser anda bara sin
+  // egen rad (workers_select_egen), sa listan vore en sida med en person pa.
+  { href: "/alla-arbetare", label: "Alla Arbetare", bara: "arbetsledare" },
 ];
 
 /** Vilken av de tre man star pa. Exakt matchning for Hem, prefix for de andra,
@@ -41,6 +57,14 @@ function isCurrent(pathname: string, href: string) {
 export function NavMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { roll } = useAuth();
+
+  // Null-rollen behandlas som arbetare: en inloggning utan rad i accounts ska
+  // se mindre, inte mer. Samma hallning som kit.ar_arbetsledare(), som faller
+  // stangt pa ett konto den inte hittar.
+  const synligaNav = NAV.filter(
+    (item) => item.bara === undefined || item.bara === (roll ?? "arbetare")
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -111,7 +135,7 @@ export function NavMenu() {
               className="mx-auto mb-2 mt-3 h-1 w-10 rounded-full bg-white/25"
             />
             <div className="divide-y divide-night-line">
-              {NAV.map((item) => {
+              {synligaNav.map((item) => {
                 const current = isCurrent(pathname, item.href);
                 return (
                   <Link

@@ -127,18 +127,77 @@ create table shifts (
   -- Sanningen for alla timsummor i appen och for "Ordinarie tid" i
   -- Arbetsdagboken. Harleds INTE ur tiderna nedan: ett pass med obetald rast
   -- har ett langre spann an de timmar som faktiskt arbetats.
-  hours numeric not null,
+  -- Nullbar: ett pass som ar 'open' eller 'closed' har annu inget bekraftat
+  -- timtal. shifts_confirmed_has_hours nedan garanterar att ett BEKRAFTAT pass
+  -- alltid har ett, sa varken lonen eller Arbetsdagboken kan na en null.
+  hours numeric,
   -- "Pass Tider" i Arbetsdagboken. Nullbara for rader som loggades innan
   -- kolumnerna fanns; dokumentet renderar da en tom cell i stallet for att
   -- hitta pa ett spann.
   start_time time,
   end_time time,
+  -- Passets lage i livscykeln. Default 'confirmed' och inte 'open': Logga Pass
+  -- skriver en fardig rad med ett fardigt timtal och kanner inte till nagon
+  -- stampling, sa en sadan rad ar slutgiltig. Stamplingsflodet skriver 'open'
+  -- explicit vid instampling.
+  status text not null default 'confirmed',
+  -- De faktiskt stamplade ogonblicken, till skillnad fran det planerade
+  -- spannet ovan. timestamptz och inte time: en stampling ar en handelse som
+  -- intraffar en gang, och ska ga att jamfora over en sommartidsovergang.
+  -- clock_out_time null medan passet pagar -- sa kanns ett pagaende pass igen.
+  clock_in_time timestamptz,
+  clock_out_time timestamptz,
+  -- Timmar harledda ur stamplingarna. Underlag, inte lon: hours ovan ar
+  -- arbetsledarens bekraftade varde och asidosatter alltid det har.
+  calculated_hours numeric,
+  -- Sparet efter den ursprungliga stamplingen. Arbetsledaren far skriva over
+  -- clock_in_time/clock_out_time; det som inte far handa ar att arbetarens egen
+  -- stampling forsvinner nar hen gor det. Halls append-only av
+  -- kit.shifts_preserve_clock_originals() -- se migration #09, som ocksa ar den
+  -- enda platsen triggern definieras. OBS: "original" betyder forsta VARDET
+  -- kolumnen fick, inte "arbetarens stampling"; triggern kan inte se vem som
+  -- skriver. clock_edited_by ar auth.uid(), null nar andringen skedde utan JWT.
+  clock_in_original timestamptz,
+  clock_out_original timestamptz,
+  clock_edited_at timestamptz,
+  clock_edited_by uuid,
   created_at timestamptz not null default now(),
   -- Antingen bada tiderna eller ingen. Ett halvifyllt spann gar inte att
   -- skriva som "07:00-16:00" och skulle tyst ge en skev cell.
   constraint shifts_pass_times_paired check (
     (start_time is null and end_time is null)
     or (start_time is not null and end_time is not null)
+  ),
+  constraint shifts_status_check check (
+    status in ('open', 'closed', 'confirmed')
+  ),
+  -- Motvikten till att hours ar nullbar: ett pass kan inte bli bekraftat utan
+  -- ett timtal. Null betyder darmed exakt "annu inte bekraftat".
+  constraint shifts_confirmed_has_hours check (
+    status <> 'confirmed' or hours is not null
+  ),
+  constraint shifts_calculated_hours_non_negative check (
+    calculated_hours is null or calculated_hours >= 0
+  ),
+  -- Null-fallen ar utskrivna trots att ett check-villkor som utvarderas till
+  -- null redan passerar: den som laser raden ska se att ett pagaende pass ar
+  -- tillatet, inte behova rakna ut det.
+  constraint shifts_clock_order check (
+    clock_in_time is null
+    or clock_out_time is null
+    or clock_in_time <= clock_out_time
+  ),
+  -- Utan det har vore villkoret ovan tandlost at ena hallet: en utstampling
+  -- utan instampling skulle tyst passera, och det ar inte ett pass.
+  constraint shifts_clock_out_requires_in check (
+    clock_out_time is null or clock_in_time is not null
+  ),
+  -- Samma ordningskrav pa originalen. Ett original som ar bakvant vore ett
+  -- bevis som motsager sig sjalvt.
+  constraint shifts_clock_original_order check (
+    clock_in_original is null
+    or clock_out_original is null
+    or clock_in_original <= clock_out_original
   )
 );
 
@@ -149,6 +208,11 @@ create table shifts (
 create index shifts_project_id_idx on shifts(project_id);
 create index shifts_worker_id_idx on shifts(worker_id);
 create index shifts_shift_date_idx on shifts(shift_date);
+-- Arbetsledarens bekraftelseko laser bara det som annu inte ar bekraftat, en
+-- krympande svans i en tabell som vaxer med varje loggat pass. shift_date
+-- forst, for att kon sorteras aldsta passerade pass overst.
+create index shifts_open_status_idx on shifts(shift_date, status)
+  where status <> 'confirmed';
 create index project_services_project_id_idx on project_services(project_id);
 create index project_workers_worker_id_idx on project_workers(worker_id);
 -- Partiella: bara det som faktiskt ligger i papperskorgen indexeras, vilket ar

@@ -49,6 +49,18 @@ export function formatHoursSv(hours: number): string {
     : String(rounded).replace(".", ",");
 }
 
+/**
+ * Timmarna på ett pass som kanske inte är bekräftat än, med enheten inbakad.
+ *
+ * Enheten sitter med här och inte som ett " h" bredvid anropet, just för att
+ * null-fallet inte ska bli "– h". Ett obekräftat pass får ett tankstreck:
+ * "0 h" vore ett besked om att arbetaren inte jobbade, och det är inte vad
+ * null betyder (spec 5.3).
+ */
+export function formatPassTimmar(hours: number | null): string {
+  return hours === null ? "–" : `${formatHoursSv(hours)} h`;
+}
+
 /** 'HH:MM' eller 'HH:MM:SS' -> minuter sedan midnatt, eller null om värdet
  *  varken är det ena eller det andra. */
 function timeToMinutes(value: string): number | null {
@@ -139,14 +151,16 @@ export function pad(n: number) {
 }
 
 /**
- * Antal dagar i den valda manaden. Utan manad visas 31 dagar, och utan ar
- * raknas februari som skottmanad -- annars skulle den 29:e forsvinna innan
- * anvandaren hunnit skriva aret.
+ * Antal dagar i den valda manaden.
+ *
+ * Bada varden kravs. Datumfalten fick forr skicka null och fick da 31 dagar
+ * respektive en skottfebruari tillbaka, men de star numera alltid pa en
+ * riktig manad -- i brist pa ett val den manad anvandaren befinner sig i --
+ * sa det finns ingen halv frage kvar att svara pa.
  */
-export function daysInMonth(year: number | null, month: number | null) {
-  if (!month) return 31;
+export function daysInMonth(year: number, month: number) {
   // Dag 0 i nasta manad ar sista dagen i den har.
-  return new Date(Date.UTC(year ?? 2000, month, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 /**
@@ -188,6 +202,21 @@ export function stockholmToday(): string {
  * 'YYYY-MM-DD' is a calendar date and has no time in it, and parsing it in a
  * timezone west of UTC would slide every square one day to the left.
  */
+/**
+ * 'YYYY-MM-DD' plus eller minus ett antal dagar, som 'YYYY-MM-DD'.
+ *
+ * Rakningen sker i UTC med klockan pa 12:00 — samma grepp som resten av filen.
+ * Datumet ar en etikett och inte ett ogonblick, och middag ar tillrackligt
+ * langt fran bada midnatterna for att en sommartidsovergang inte ska kunna
+ * putta resultatet en dag fel.
+ */
+export function addDays(isoDate: string, delta: number): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d, 12));
+  t.setUTCDate(t.getUTCDate() + delta);
+  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+}
+
 export function weekdayIndex(isoDate: string): number {
   const [y, m, d] = isoDate.split("-").map(Number);
   // getUTCDay is Sunday-first; Sweden reads a calendar Monday-first.
@@ -196,6 +225,43 @@ export function weekdayIndex(isoDate: string): number {
 
 /** The column headings of the Kalender grid, Monday first. */
 export const WEEKDAY_SHORT = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
+
+/**
+ * Veckodagarna som datumfältens kalender skriver dem: "må", "ti", "on" …
+ *
+ * Härledda ur WEEKDAY_SHORT i stället för skrivna en tredje gång — två
+ * bokstäver av "Mån" är "må", och en lista till att hålla i synk är en lista
+ * till som kan börja på fel dag. Gemener för att raden är en rubrik över
+ * siffror och inte en rad att läsa: versaler skulle konkurrera med datumen.
+ */
+export const WEEKDAY_MINI = WEEKDAY_SHORT.map((d) => d.slice(0, 2).toLowerCase());
+
+/** Hela veckodagsnamnen, i samma ordning som WEEKDAY_SHORT. */
+export const WEEKDAY_LONG = [
+  "Måndag",
+  "Tisdag",
+  "Onsdag",
+  "Torsdag",
+  "Fredag",
+  "Lördag",
+  "Söndag",
+];
+
+/**
+ * "Fre" för ett 'YYYY-MM-DD' — raden datumfälten skriver ovanför sin dagruta.
+ *
+ * Medvetet samma tre bokstäver som Kalenderns kolumnrubriker: de två läses
+ * minuter isär, och ett "Fredag" här mot ett "Fre" där skulle få läsaren att
+ * stanna och jämföra i stället för att bara känna igen dagen.
+ */
+export function weekdayShortSv(isoDate: string): string {
+  return WEEKDAY_SHORT[weekdayIndex(isoDate)];
+}
+
+/** Hela veckodagsnamnet — det som läses upp, där bara "Fre" syns. */
+export function weekdayNameSv(isoDate: string): string {
+  return WEEKDAY_LONG[weekdayIndex(isoDate)];
+}
 
 const WEEKDAY_DATE_FORMATTER = new Intl.DateTimeFormat("sv-SE", {
   weekday: "long",

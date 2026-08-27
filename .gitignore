@@ -52,3 +52,8 @@ DocMaker/dist/
 
 # local screenshot scratch
 .tmp-shots/
+
+# Den offline-paketerade DocMaker-byggen som ligger under public/ (~380 MB).
+# Artefakter, inte kallkod: de byggs ur DocMaker/ och ska inte in i historiken.
+public/DocMaker-Offline-Windows/
+public/DocMaker-Offline-Windows.zip

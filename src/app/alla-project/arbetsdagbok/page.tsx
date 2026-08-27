@@ -119,13 +119,22 @@ function ArbetsdagbokScreen() {
     return data === null ? null : { data, passProblems };
   }, [id]);
 
+  // Obekraftade pass ar en HARD sparr, inte en fraga. Spec avsnitt 7 gor
+  // dokumentet omojligt att skapa forran arbetsledaren bekraftat allt i
+  // intervallet -- det ar hela dokumentets syfte som pATryckningsmedel. Darfor
+  // star den utanfor `fortsatt`-undantaget: det finns for uppgifter kunden
+  // genuint inte har (ett org-nummer ingen minns), och ett obekraftat pass ar
+  // inte en sadan uppgift. Det loser sig, och tills dess far dokumentet vanta.
+  const obekraftade = bundle.data?.data.obekraftade ?? 0;
+
   // Grinden avgors av det som lastes, sa den kan inte stallas forran svaret ar
   // har. Fore det ar `bundle.data` undefined och <Query> ritar skelettet.
   const gated =
     bundle.data != null &&
-    (missingQuestions(bundle.data.data).length > 0 ||
-      bundle.data.passProblems.length > 0) &&
-    fortsatt !== "1";
+    (obekraftade > 0 ||
+      ((missingQuestions(bundle.data.data).length > 0 ||
+        bundle.data.passProblems.length > 0) &&
+        fortsatt !== "1"));
 
   if (bundle.data == null || gated) {
     return (
@@ -151,6 +160,23 @@ function ArbetsdagbokScreen() {
               <EmptyState
                 title="Projectet finns inte."
                 hint="Det kan ha tagits bort. Kolla i Papperskorgen om det ska tillbaka."
+                action={
+                  <ButtonLink href="/alla-project" size="md">
+                    Alla Project
+                  </ButtonLink>
+                }
+              />
+            ) : loaded.data.obekraftade > 0 ? (
+              /* Ingen enkat och ingen "skapa anda"-utvag: det finns ingenting
+                 for anvandaren att fylla i har. Passen bekraftas i
+                 bekraftelsekon, och dokumentet oppnar sig sjalvt nar de ar det. */
+              <EmptyState
+                title={
+                  loaded.data.obekraftade === 1
+                    ? "Ett pass ar inte bekraftat an."
+                    : `${loaded.data.obekraftade} pass ar inte bekraftade an.`
+                }
+                hint="Arbetsdagboken ar det juridiska underlaget for arbetad tid, sa den skapas forst nar varje pass i projectet har ett bekraftat timtal. Bekrafta passen sa oppnar sig dokumentet har."
                 action={
                   <ButtonLink href="/alla-project" size="md">
                     Alla Project

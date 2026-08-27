@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Button, buttonClass } from "@/components/Button";
 import {
   Chevron,
@@ -8,6 +8,7 @@ import {
   dropdownTrigger,
   useDropdown,
 } from "@/components/Dropdown";
+import { Wheel, WheelPlate } from "@/components/Wheel";
 import { pad } from "@/lib/format";
 
 /**
@@ -23,12 +24,6 @@ import { pad } from "@/lib/format";
  * stående halvvägs — värdet läses ur rullningen när den lagt sig.
  */
 
-/** Radhöjd och antal synliga rader. Allt annat i hjulet mäts ur dessa två. */
-const ROW = 40;
-const VISIBLE = 5;
-/** Tomrum över och under listan, så att första och sista raden når mitten. */
-const EDGE = ((VISIBLE - 1) / 2) * ROW;
-
 const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
 
 /**
@@ -38,177 +33,10 @@ const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
 const MINUTE_STEP = 5;
 const MINUTES = Array.from({ length: 60 / MINUTE_STEP }, (_, i) => pad(i * MINUTE_STEP));
 
-function clamp(index: number, length: number) {
-  return Math.min(Math.max(index, 0), length - 1);
-}
-
-/**
- * Var i hjulet ett värde ligger. En minut utanför stegen — t.ex. 07:23 från en
- * rad som sparats någon annanstans ifrån — landar på närmaste rad i stället för
- * att tappas.
- */
-function indexOf(values: string[], value: string) {
-  const exact = values.indexOf(value);
-  if (exact >= 0) return exact;
-
-  const target = Number(value);
-  if (!Number.isFinite(target)) return 0;
-  let best = 0;
-  values.forEach((v, i) => {
-    if (Math.abs(Number(v) - target) < Math.abs(Number(values[best]) - target)) best = i;
-  });
-  return best;
-}
-
 /** 'HH:MM' isär, med förslaget som utgångsläge när fältet är tomt. */
 function splitTime(value: string, fallback: string) {
   const source = /^\d{2}:\d{2}/.test(value) ? value : fallback;
   return { hour: source.slice(0, 2), minute: source.slice(3, 5) };
-}
-
-/**
- * En kolumn i hjulet.
- *
- * Rullningen är styrande: fingret, mushjulet och piltangenterna ändrar samma
- * sak, och värdet läses tillbaka först när rullningen stannat. Därför ställs
- * kolumnen bara en gång — vid öppning — annars skulle den rycka tillbaka mitt i
- * en rörelse.
- */
-function Wheel({
-  label,
-  values,
-  initialValue,
-  autoFocus = false,
-  onChange,
-}: {
-  label: string;
-  values: string[];
-  /** Bara utgångsläget: därefter är det rullningen som säger vad som är valt. */
-  initialValue: string;
-  autoFocus?: boolean;
-  onChange: (value: string) => void;
-}) {
-  const listRef = useRef<HTMLDivElement>(null);
-  const settleTimer = useRef<number | null>(null);
-  /**
-   * Öppningen ställer hjulet på förslaget genom att rulla dit. Utan den här
-   * flaggan skulle den rullningen se ut som ett val, och ett tomt fält vore
-   * ifyllt av att man tittat på det.
-   */
-  const touched = useRef(false);
-  const optionId = useId();
-  const [active, setActive] = useState(() => indexOf(values, initialValue));
-
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list) return;
-    list.scrollTop = indexOf(values, initialValue) * ROW;
-    if (autoFocus) list.focus({ preventScroll: true });
-    return () => {
-      if (settleTimer.current) clearTimeout(settleTimer.current);
-    };
-    // Enbart vid öppning: efter det är det hjulet som bär värdet.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function commit(index: number) {
-    touched.current = true;
-    setActive(index);
-    onChange(values[index]);
-  }
-
-  function scrollTo(index: number, behavior: ScrollBehavior) {
-    listRef.current?.scrollTo({ top: index * ROW, behavior });
-  }
-
-  /**
-   * Ett hjul har inget "släpp": fingret lämnar skärmen långt innan rullningen
-   * tagit slut. Värdet läses därför en stund efter den sista rörelsen, när
-   * snäppet redan lagt raden mitt i plattan.
-   */
-  function onScroll() {
-    const list = listRef.current;
-    if (!list) return;
-    const index = clamp(Math.round(list.scrollTop / ROW), values.length);
-    setActive((prev) => (prev === index ? prev : index));
-
-    if (settleTimer.current) clearTimeout(settleTimer.current);
-    settleTimer.current = window.setTimeout(() => {
-      if (!touched.current || !listRef.current) return;
-      const settled = clamp(Math.round(listRef.current.scrollTop / ROW), values.length);
-      onChange(values[settled]);
-    }, 90);
-  }
-
-  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    let next: number;
-    if (event.key === "ArrowDown") next = active + 1;
-    else if (event.key === "ArrowUp") next = active - 1;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = values.length - 1;
-    else {
-      // PageUp/PageDown rullar kolumnen på egen hand — då är det ett val ändå.
-      touched.current = true;
-      return;
-    }
-
-    event.preventDefault();
-    const index = clamp(next, values.length);
-    commit(index);
-    scrollTo(index, "smooth");
-  }
-
-  return (
-    <div
-      ref={listRef}
-      role="listbox"
-      tabIndex={0}
-      aria-label={label}
-      aria-activedescendant={`${optionId}-${active}`}
-      onScroll={onScroll}
-      onPointerDown={() => (touched.current = true)}
-      onWheel={() => (touched.current = true)}
-      onKeyDown={onKeyDown}
-      style={{ height: VISIBLE * ROW, paddingBlock: EDGE }}
-      className="min-w-0 flex-1 snap-y snap-mandatory overflow-y-scroll overscroll-contain rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-night-accent/40 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_28%,black_72%,transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_28%,black_72%,transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {values.map((v, i) => {
-        // Raderna tonar och krymper med avståndet till plattan, så att mitten
-        // syns som mitten även när hjulet står stilla.
-        const distance = Math.abs(i - active);
-        // Mitten ar vit som de ovriga raderna, inte accentfargad: markeringen
-        // bars av storleken, vikten och plattan bakom — och eftersom fargen
-        // darmed inte ar ensam barare av "vald" fungerar hjulet lika bra for
-        // den som inte skiljer amber fran vitt. Raderna darifran tonar ut i
-        // vitt — en gradvis nedtoning som pa svart gor samma jobb som
-        // gratonerna gjorde pa vitt.
-        const look =
-          distance === 0
-            ? "text-xl font-bold text-white"
-            : distance === 1
-              ? "text-lg text-white/75"
-              : distance === 2
-                ? "text-base text-white/45"
-                : "text-sm text-white/25";
-        return (
-          <div
-            key={v}
-            id={`${optionId}-${i}`}
-            role="option"
-            aria-selected={i === active}
-            onClick={() => {
-              commit(i);
-              scrollTo(i, "smooth");
-            }}
-            style={{ height: ROW }}
-            className={`flex cursor-pointer snap-center items-center justify-center tabular-nums ${look}`}
-          >
-            {v}
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 /** Timme och minut sida vid sida, med plattan bakom båda. */
@@ -237,12 +65,7 @@ function TimeWheels({
 
   return (
     <div className="relative">
-      {/* Plattan ligger under kolumnerna: den ska inte tona bort med raderna. */}
-      <div
-        aria-hidden="true"
-        style={{ top: EDGE, height: ROW }}
-        className="pointer-events-none absolute inset-x-1 rounded-xl border-y border-white/15 bg-white/10"
-      />
+      <WheelPlate />
       {/* Smalare an plattan: timmen och minuten ska hanga ihop kring kolonet
           i stallet for att dras ut mot var sin kant. */}
       <div className="relative mx-auto flex max-w-60 items-center">

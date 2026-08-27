@@ -212,6 +212,7 @@ export function DropdownOption({
   selected,
   chosen = selected,
   today = false,
+  ariaLabel,
   onSelect,
   align = "center",
   className = "",
@@ -226,6 +227,12 @@ export function DropdownOption({
   chosen?: boolean;
   /** Dagens manad respektive dagens dag -- se punkten nedan. */
   today?: boolean;
+  /**
+   * Ersatter den upplasta texten nar rutan sager mindre an den visar.
+   * Dagrutnatet ar fallet: veckodagen star i en kolumnrubrik som skarmlasaren
+   * aldrig kommer at, sa varje dag bar den i sin egen etikett i stallet.
+   */
+  ariaLabel?: string;
   onSelect: () => void;
   /** Rutnat (manad, dag) centrerar; en lista med namn lases battre vansterstalld. */
   align?: "center" | "left";
@@ -237,6 +244,7 @@ export function DropdownOption({
       type="button"
       role="option"
       aria-selected={selected}
+      aria-label={ariaLabel}
       onClick={onSelect}
       /* min-h-11: ett alternativ i ett rutnat ar det minsta man traffar i hela
          appen, och 44px ar golvet aven nar rutan bara innehaller "3". */

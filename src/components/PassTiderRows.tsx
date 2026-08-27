@@ -49,7 +49,11 @@ export function usePassProblemRows(problems: PassProblem[]) {
     // Passet har bara sina timmar att gå på, så slutet föreslås ur dem: väljer
     // man 07:30 på ett åttatimmarspass står det 15:30 innan man hunnit fram
     // till andra hjulet. Ett slut som redan står kvar rörs inte.
-    const suggested = row.end === "" ? addHours(start, problems[index].hours) : null;
+    // Ett obekräftat pass har inga timmar att föreslå ett slut ur, så då
+    // föreslås inget alls och användaren får välja båda hjulen själv.
+    const passHours = problems[index].hours;
+    const suggested =
+      row.end === "" && passHours !== null ? addHours(start, passHours) : null;
     patch(index, suggested ? { start, end: suggested } : { start });
   }
 
@@ -143,9 +147,19 @@ export function PassTiderRows({
                   {formatWeekdayDateSv(problem.date)} på {projectName} projectet?
                 </h3>
                 <p className="mt-1 text-xs leading-relaxed text-white/60">
-                  Passet är loggat som {formatHoursSv(problem.hours)} h. Timmarna
-                  ändras inte här — det är bara Pass Tider som saknas i
-                  dokumentet.
+                  {problem.hours === null ? (
+                    <>
+                      Passet är inte bekräftat än, så det har inga timmar att
+                      visa. Tiderna går att fylla i ändå — timmarna sätts när
+                      arbetsledaren bekräftar passet.
+                    </>
+                  ) : (
+                    <>
+                      Passet är loggat som {formatHoursSv(problem.hours)} h.
+                      Timmarna ändras inte här — det är bara Pass Tider som
+                      saknas i dokumentet.
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -173,7 +187,9 @@ export function PassTiderRows({
                 <FieldHint tone="warn">
                   Välj båda klockslagen — ett halvt spann går inte att skriva ut.
                 </FieldHint>
-              ) : span !== null && Math.abs(span - problem.hours) > 0.01 ? (
+              ) : span !== null &&
+                problem.hours !== null &&
+                Math.abs(span - problem.hours) > 0.01 ? (
                 /* Spannet är inte timmarna. Ett konstaterande och inte en
                    invändning: så ser ett pass med obetald rast ut, och båda
                    talen skrivs ut precis som de står. */

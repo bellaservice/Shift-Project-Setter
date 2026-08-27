@@ -1,6 +1,6 @@
 import { GroupLabel } from "@/components/Screen";
 import { formatDate } from "@/lib/formatDate";
-import { formatHoursSv } from "@/lib/format";
+import { formatPassTimmar } from "@/lib/format";
 import type { RecentShiftRow } from "@/lib/types";
 
 /**
@@ -37,7 +37,7 @@ export function RecentShiftsList({ shifts }: { shifts: RecentShiftRow[] }) {
                   {r.workerName}
                 </span>
                 <span className="shrink-0 text-sm font-bold tabular-nums text-night-accent">
-                  {formatHoursSv(r.hours)} h
+                  {formatPassTimmar(r.hours)}
                 </span>
               </div>
             ))}

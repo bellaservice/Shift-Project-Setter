@@ -52,7 +52,8 @@ export type Shift = {
   project_id: string;
   worker_id: string;
   shift_date: string;
-  hours: number;
+  /** Null tills arbetsledaren bekräftat passet (spec 5.3) — aldrig noll timmar. */
+  hours: number | null;
   /** "Pass Tider". Postgres `time`, so 'HH:MM:SS'. Null on rows logged before
    *  the columns existed; paired by shifts_pass_times_paired. */
   start_time: string | null;
@@ -83,7 +84,8 @@ export type OngoingProject = {
 export type RecentShiftRow = {
   id: string;
   shift_date: string;
-  hours: number;
+  /** Null tills arbetsledaren bekräftat passet (spec 5.3) — aldrig noll timmar. */
+  hours: number | null;
   worker_id: string;
   workerName: string;
 };
@@ -159,8 +161,9 @@ export type PassProblem = {
    *  och slutade Anna den ... ". */
   workers: string[];
   /** Kolumnen "Pass Timmar". Bara sammanhang i frågan — den är redan besvarad
-   *  och ändras inte här. */
-  hours: number;
+   *  och ändras inte här. Null när passet ännu inte bekräftats; grupperas då
+   *  under en egen markör, aldrig ihop med ett pass som bekräftats till 0. */
+  hours: number | null;
 };
 
 /** Everything the Arbetsdagbok document renders, already folded into the shape
@@ -183,8 +186,17 @@ export type ArbetsdagbokData = {
   /** Service names only, no prices — the value repeated down the "Tjanst"
    *  column of every day table. */
   tjanst: string;
-  /** Cover "Ordinarie tid" — sum of every pass logged to the project. */
+  /** Cover "Ordinarie tid" — sum of every CONFIRMED pass logged to the project.
+   *  Obekräftade pass räknas inte in; de räknas i `obekraftade` i stället. */
   totalHours: number;
+  /** Hur många pass på projectet som ännu inte bekräftats av arbetsledaren
+   *  (`hours` är null). Sådana pass finns medvetet INTE i `days` — dokumentet
+   *  får inte trycka en nolla för ett pass som bara inte är klart än.
+   *
+   *  Grinden framför dokumentet är hård när den här är > 0: till skillnad från
+   *  de andra frågorna går den inte att gå förbi med `fortsatt=1`, eftersom
+   *  spec avsnitt 7 gör den till hela dokumentets spärr. */
+  obekraftade: number;
   days: ArbetsdagbokDay[];
 };
 
@@ -311,7 +323,8 @@ export type DayShift = {
   projectId: string;
   /** Project Namn, med adressen som reserv — alltid `projectLabel`. */
   projectName: string;
-  hours: number;
+  /** Null tills arbetsledaren bekräftat passet (spec 5.3) — aldrig noll timmar. */
+  hours: number | null;
   /** 'HH:MM', eller null när passet loggades utan Pass Tider. */
   startTime: string | null;
   endTime: string | null;
@@ -326,8 +339,77 @@ export type ShiftDetail = {
   workerId: string;
   /** Bara till att känna igen passet på — arbetaren går inte att byta. */
   workerName: string;
-  hours: number;
+  /** Null tills arbetsledaren bekräftat passet (spec 5.3) — aldrig noll timmar. */
+  hours: number | null;
   /** 'HH:MM', eller null. */
   startTime: string | null;
   endTime: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Bekraftelsekon (spec Fas 4 och avsnitt 6)
+// ---------------------------------------------------------------------------
+
+/** Passets lage i livscykeln. Speglar shifts_status_check. */
+export type ShiftStatus = "open" | "closed" | "confirmed";
+
+/**
+ * Ett pass som vantar pa arbetsledarens bekraftelse.
+ *
+ * Kon innehaller bara obekraftade pass, sa `status` ar aldrig 'confirmed' har.
+ * Bekraftelse ar slutgiltig (spec avsnitt 6), vilket ar precis varfor raden
+ * lamnar kon i samma stund den bekraftas: det finns ingen vag tillbaka in.
+ */
+export type BekraftaShift = {
+  id: string;
+  shiftDate: string;
+  workerName: string;
+  /** Project Namn med adressen som reserv — alltid via `projectLabel`. */
+  projectName: string;
+  status: Exclude<ShiftStatus, "confirmed">;
+  /**
+   * Gallande stamplingar som ISO-strangar. `clockOut` null medan passet pagar
+   * — det ar sa ett 'open' pass kanns igen. Bada null pa ett pass som loggats
+   * via Logga Pass utan nagon stampling alls.
+   */
+  clockIn: string | null;
+  clockOut: string | null;
+  /**
+   * Forsta varde kolumnen fick. Skiljer sig fran de gallande tiderna bara nar
+   * nagon skrivit over dem, vilket ar exakt vad raden visar for anvandaren.
+   * OBS: "original" betyder forsta registrerade vardet, inte nodvandigtvis
+   * arbetarens egen stampling (spec 5.5).
+   */
+  clockInOriginal: string | null;
+  clockOutOriginal: string | null;
+  /** Null tills en gallande tid forst skrevs over. */
+  clockEditedAt: string | null;
+  /** Timmarna ur klockan. Null nar passet inte ar utstamplat. Underlag, aldrig lon. */
+  calculatedHours: number | null;
+  /** Alltid null i kon — ett pass med bekraftade timmar ar bekraftat. */
+  hours: number | null;
+};
+
+/** Kon grupperad per dag, aldsta dagen forst (spec Fas 4). */
+export type BekraftaDay = {
+  /** 'YYYY-MM-DD'. Rubriken skrivs ur den med `formatWeekdayDateSv`. */
+  date: string;
+  shifts: BekraftaShift[];
+};
+
+/**
+ * Ett av den inloggade arbetarens egna pass, som stamplingsskarmen visar det.
+ *
+ * `clockIn` null = schemalagt men inte pabörjat. `clockIn` satt och `clockOut`
+ * null = pagar just nu. Bada satta = utstamplat, och da ligger passet i
+ * arbetsledarens ko i stallet (se BekraftaShift).
+ */
+export type StamplaPass = {
+  id: string;
+  /** 'YYYY-MM-DD'. */
+  shiftDate: string;
+  /** Project Namn med adressen som reserv — alltid via `projectLabel`. */
+  projectName: string;
+  clockIn: string | null;
+  clockOut: string | null;
 };

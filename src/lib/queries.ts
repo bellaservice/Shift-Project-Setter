@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/browser";
 import {
+  addDays,
   formatPassTider,
   monthStartOf,
   projectLabel,
@@ -11,6 +12,7 @@ import type {
   ArbetsdagbokDay,
   Arende,
   ArendeDetalj,
+  BekraftaDay,
   CalendarDay,
   DayShift,
   HomeStats,
@@ -25,6 +27,7 @@ import type {
   ProjectWithDetails,
   RecentShiftRow,
   ShiftDetail,
+  StamplaPass,
   TrashItem,
   Worker,
   WorkerListItem,
@@ -49,6 +52,34 @@ function nextMonthStart(monthStart: string): string {
 /** numeric hours folded through IEEE doubles: 0.1 + 0.2 must not reach a screen. */
 function roundHours(hours: number): number {
   return Math.round(hours * 100) / 100;
+}
+
+/**
+ * `shifts.hours` är nullbar sedan stämplingen infördes: null betyder "ännu inte
+ * bekräftat av arbetsledaren" (spec 5.3), aldrig noll timmar.
+ *
+ * Varje läsning måste gå genom `readHours` eller `hoursForSum` — aldrig genom
+ * `Number()` direkt. Skälet är att `Number(null)` är `0` i JavaScript, inte
+ * `NaN`, och att appens Supabase-klient är otypad: en null hade alltså blivit
+ * en tyst nolla utan att vare sig kompilatorn eller körningen sagt ifrån. Det
+ * är precis den sortens fel som inte upptäcks förrän någon undrar varför en
+ * lönesumma är för låg.
+ *
+ * PostgREST lämnar dessutom `numeric` som sträng, så konverteringen behövs —
+ * det är bara tolkningen av frånvaro som skiljer.
+ */
+function readHours(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Bidraget till en timsumma. Ett obekräftat pass lägger till ingenting — och
+ * gör det avsiktligt och synligt här, i stället för av misstag via `Number()`.
+ */
+function hoursForSum(raw: unknown): number {
+  return readHours(raw) ?? 0;
 }
 
 export async function getHomeStats(): Promise<HomeStats> {
@@ -98,7 +129,7 @@ export async function getHomeStats(): Promise<HomeStats> {
   }
 
   const totalHours = (hoursResult.data ?? []).reduce(
-    (sum, s) => sum + Number(s.hours),
+    (sum, s) => sum + hoursForSum(s.hours),
     0
   );
 
@@ -162,7 +193,7 @@ export async function getOngoingProjects(): Promise<OngoingProject[]> {
   for (const s of shiftsResult.data ?? []) {
     hoursByProject.set(
       s.project_id,
-      (hoursByProject.get(s.project_id) ?? 0) + Number(s.hours)
+      (hoursByProject.get(s.project_id) ?? 0) + hoursForSum(s.hours)
     );
   }
 
@@ -282,7 +313,7 @@ export async function getRecentShiftsForProject(
   return shifts.map((s) => ({
     id: s.id,
     shift_date: s.shift_date,
-    hours: Number(s.hours),
+    hours: readHours(s.hours),
     worker_id: s.worker_id,
     workerName: nameById.get(s.worker_id) ?? "Okand arbetare",
   }));
@@ -322,7 +353,7 @@ export async function getProjectsByStartMonth(): Promise<ProjectMonthGroup[]> {
   for (const s of shiftsResult.data ?? []) {
     hoursByProject.set(
       s.project_id,
-      (hoursByProject.get(s.project_id) ?? 0) + Number(s.hours)
+      (hoursByProject.get(s.project_id) ?? 0) + hoursForSum(s.hours)
     );
   }
 
@@ -382,7 +413,7 @@ export async function getWorkerList(): Promise<WorkerListItem[]> {
   for (const s of shiftsResult.data ?? []) {
     hoursByWorker.set(
       s.worker_id,
-      (hoursByWorker.get(s.worker_id) ?? 0) + Number(s.hours)
+      (hoursByWorker.get(s.worker_id) ?? 0) + hoursForSum(s.hours)
     );
     const seen = projectsByWorker.get(s.worker_id) ?? new Set<string>();
     seen.add(s.project_id);
@@ -463,17 +494,29 @@ export async function getArbetsdagbokData(
     for (const w of workers ?? []) nameById.set(w.id, w.name);
   }
 
+  // Dokumentet är ett juridiskt underlag, och ett obekräftat pass har inget
+  // timtal att skriva in i det. Raden får därför INTE folda in i dagtabellen:
+  // `hoursForSum` hade gjort den till en nolla, och en nolla i det här
+  // dokumentet läses som "arbetaren var här och jobbade inte", inte som "det
+  // här är inte klart än". Den räknas i stället, och räkningen stänger grinden
+  // i alla-project/arbetsdagbok/page.tsx (spec avsnitt 7).
   const byDate = new Map<string, ArbetsdagbokDay>();
   let totalHours = 0;
+  let obekraftade = 0;
   for (const s of shifts) {
-    totalHours += Number(s.hours);
+    const hours = readHours(s.hours);
+    if (hours === null) {
+      obekraftade += 1;
+      continue;
+    }
+    totalHours += hours;
     const day: ArbetsdagbokDay = byDate.get(s.shift_date) ?? {
       date: s.shift_date,
       rows: [],
     };
     day.rows.push({
       arbetare: nameById.get(s.worker_id) ?? "Okand arbetare",
-      hours: Number(s.hours),
+      hours,
       passTider: formatPassTider(s.start_time, s.end_time),
     });
     byDate.set(s.shift_date, day);
@@ -494,6 +537,7 @@ export async function getArbetsdagbokData(
       .map((s) => s.service_name)
       .join(", "),
     totalHours: roundHours(totalHours),
+    obekraftade,
     days: [...byDate.values()].map((day) => ({
       ...day,
       rows: day.rows.sort((a, b) => a.arbetare.localeCompare(b.arbetare, "sv")),
@@ -542,8 +586,12 @@ export async function getPassProblems(
   // på passet får samma siffra.
   const byPass = new Map<string, PassProblem>();
   for (const shift of shifts ?? []) {
-    const hours = Number(shift.hours);
-    const key = `${shift.shift_date}|${hours}`;
+    const hours = readHours(shift.hours);
+    // Nyckeln måste skilja "obekräftat" från siffran 0, och de två är inte
+    // samma sak: `Number(null)` hade gjort dem identiska och tyst slagit ihop
+    // varje obekräftat pass på dagen med ett pass som faktiskt bekräftats till
+    // noll timmar. Markören kan inte krocka med ett tal.
+    const key = `${shift.shift_date}|${hours === null ? "obekraftat" : hours}`;
     const pass: PassProblem = byPass.get(key) ?? {
       shiftIds: [],
       date: shift.shift_date,
@@ -650,7 +698,7 @@ export async function getMonthCalendar(
 
   for (const s of rawShifts) {
     const day = cell(s.shift_date);
-    day.hours += Number(s.hours);
+    day.hours += hoursForSum(s.hours);
     // En mängd av NAMN och inte av id:n: två pass på samma arbetare samma dag
     // är en person på plats, och rutan ska inte skriva ut henne två gånger.
     day.workers.add(nameById.get(s.worker_id) ?? "Okand arbetare");
@@ -734,7 +782,7 @@ export async function getDayLog(
       workerName: nameById.get(s.worker_id) ?? "Okand arbetare",
       projectId: s.project_id,
       projectName: projectById.get(s.project_id) ?? "Okant project",
-      hours: Number(s.hours),
+      hours: readHours(s.hours),
       startTime: s.start_time ? s.start_time.slice(0, 5) : null,
       endTime: s.end_time ? s.end_time.slice(0, 5) : null,
     }))
@@ -775,7 +823,7 @@ export async function getShiftDetail(id: string): Promise<ShiftDetail | null> {
     projectId: data.project_id,
     workerId: data.worker_id,
     workerName: worker?.name ?? "Okand arbetare",
-    hours: Number(data.hours),
+    hours: readHours(data.hours),
     startTime: data.start_time ? data.start_time.slice(0, 5) : null,
     endTime: data.end_time ? data.end_time.slice(0, 5) : null,
   };
@@ -1032,4 +1080,148 @@ export async function getKontoKandidater(): Promise<KontoKandidat[]> {
       namn: w.name,
       epost: String(w.email ?? "").trim() || null,
     }));
+}
+
+// ---------------------------------------------------------------------------
+// Bekraftelsekon (spec Fas 4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Passen som vantar pa arbetsledarens bekraftelse, aldsta dagen forst.
+ *
+ * Vad som kommer in i kon, och nar:
+ *   'closed'  Utstamplat. In direkt — arbetaren ar klar och passet ar redo att
+ *             bekraftas samma dag.
+ *   'open'    Instamplat men aldrig utstamplat. In forst nar dagen passerat.
+ *             Ett pass som pagar just nu ska inte ligga i kon och se ut som ett
+ *             arende (spec Fas 3), men ett som last kvar over natten far inte
+ *             heller forsvinna — det ar precis den rad nagon glomde stampla ut.
+ *
+ * Sorteringen ar hela poangen med skarmen: aldsta passerade pass overst, sa att
+ * arbetsledaren aldrig behover scrolla for att hitta det som legat langst.
+ * `id` som sista nyckel gor ordningen total, sa listan inte kastar om sig
+ * mellan tva identiska renderingar.
+ */
+export async function getShiftsAwaitingConfirmation(): Promise<BekraftaDay[]> {
+  const today = stockholmToday();
+
+  const { data, error } = await supabase
+    .from("shifts")
+    .select(
+      "id, shift_date, status, hours, calculated_hours, clock_in_time, clock_out_time, clock_in_original, clock_out_original, clock_edited_at, projects!inner(name, address, deleted_at), workers!inner(name, deleted_at)"
+    )
+    .neq("status", "confirmed")
+    // Papperskorgen halls utanfor kon pa samma satt som utanfor varje total:
+    // ett pass vars project eller arbetare ar bortkastat ska inte krava ett
+    // beslut av nagon.
+    .is("projects.deleted_at", null)
+    .is("workers.deleted_at", null)
+    .order("shift_date", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) {
+    throw new Error(`Kunde inte lasa bekraftelsekon: ${error.message}`, {
+      cause: error,
+    });
+  }
+
+  const byDate = new Map<string, BekraftaDay>();
+  for (const s of data ?? []) {
+    const status = s.status as "open" | "closed";
+    // Det pagaende passet: instamplat, dagen inte slut. Det hor hemma pa
+    // arbetarens skarm, inte i arbetsledarens ko.
+    if (status === "open" && s.shift_date >= today) continue;
+
+    // Supabase typar en !inner-join som en array nar relationen ar till-en.
+    const project = s.projects as unknown as {
+      name: string | null;
+      address: string;
+    } | null;
+    const worker = s.workers as unknown as { name: string } | null;
+
+    const day: BekraftaDay = byDate.get(s.shift_date) ?? {
+      date: s.shift_date,
+      shifts: [],
+    };
+    day.shifts.push({
+      id: s.id,
+      shiftDate: s.shift_date,
+      workerName: worker?.name ?? "Okand arbetare",
+      projectName: project ? projectLabel(project) : "Okant project",
+      status,
+      clockIn: s.clock_in_time,
+      clockOut: s.clock_out_time,
+      clockInOriginal: s.clock_in_original,
+      clockOutOriginal: s.clock_out_original,
+      clockEditedAt: s.clock_edited_at,
+      calculatedHours: readHours(s.calculated_hours),
+      hours: readHours(s.hours),
+    });
+    byDate.set(s.shift_date, day);
+  }
+
+  return [...byDate.values()].map((day) => ({
+    ...day,
+    shifts: day.shifts.sort((a, b) =>
+      a.workerName.localeCompare(b.workerName, "sv")
+    ),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Stamplingen (spec Fas 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Den inloggade arbetarens egna pass att stampla pa.
+ *
+ * FONSTRET ar idag och igar, och det ar ett medvetet val (spec 8.4). Igar ar
+ * med av tva skal som bada handlar om verkligheten pa en byggarbetsplats:
+ * ett nattpass som borjar 22:00 stamplas ut efter midnatt och hor da till
+ * gardagens shift_date, och den som stod utan tackning nar passet tog slut ska
+ * kunna stampla ut nasta morgon i stallet for att be arbetsledaren fixa det.
+ *
+ * Fonstret ar ett FILTER, inte en spärr: databasen forbjuder inte stampling pa
+ * andra datum. Det som faktiskt haller emot ar att arbetsledaren bekraftar
+ * varje pass och satter `hours` sjalv -- klockslagen ar underlag, inte lon.
+ *
+ * `worker_id`-filtret ar appens och inte RLS: SELECT pa shifts ar oppet for
+ * alla inloggade (schemat ar arbetslagets gemensamma information). Det som ar
+ * last till egen rad ar SKRIVNINGARNA, via shifts_update_egen_stampling. Ett
+ * pass som inte ar ens eget gar alltsa varken att se har eller att stampla pa.
+ */
+export async function getMinaPassAttStampla(
+  arbetareId: string
+): Promise<StamplaPass[]> {
+  const idag = stockholmToday();
+  const igar = addDays(idag, -1);
+
+  const { data, error } = await supabase
+    .from("shifts")
+    .select("id, shift_date, clock_in_time, clock_out_time, projects!inner(name, address, deleted_at)")
+    .eq("worker_id", arbetareId)
+    .eq("status", "open")
+    .gte("shift_date", igar)
+    .lte("shift_date", idag)
+    .is("projects.deleted_at", null)
+    .order("shift_date", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) {
+    throw new Error(`Kunde inte lasa dina pass: ${error.message}`, { cause: error });
+  }
+
+  return (data ?? []).map((s) => {
+    const project = s.projects as unknown as {
+      name: string | null;
+      address: string;
+    } | null;
+    return {
+      id: s.id,
+      shiftDate: s.shift_date,
+      projectName: project ? projectLabel(project) : "Okant project",
+      clockIn: s.clock_in_time,
+      clockOut: s.clock_out_time,
+    };
+  });
 }

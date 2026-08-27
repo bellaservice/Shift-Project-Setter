@@ -8,6 +8,7 @@ import { arendeFargHex } from "@/lib/arendeFarger";
 import { GroupLabel } from "@/components/Screen";
 import {
   formatHoursSv,
+  formatPassTimmar,
   formatPassTider,
   formatWeekdayDateSv,
 } from "@/lib/format";
@@ -78,7 +79,9 @@ export function CalendarDaySheet({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  const totalHours = shifts.reduce((sum, s) => sum + s.hours, 0);
+  // Ett obekräftat pass bidrar med ingenting till dagens summa — det har inget
+  // bekräftat timtal än, och noll vore ett påstående om att det inte fanns.
+  const totalHours = shifts.reduce((sum, s) => sum + (s.hours ?? 0), 0);
 
   return (
     <div
@@ -149,7 +152,7 @@ export function CalendarDaySheet({
                         </div>
                       </div>
                       <span className="shrink-0 text-sm font-bold tabular-nums text-night-accent">
-                        {formatHoursSv(shift.hours)} h
+                        {formatPassTimmar(shift.hours)}
                       </span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-white/40" />
                     </Link>
