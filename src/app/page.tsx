@@ -5,7 +5,9 @@ import { Query } from "@/components/Query";
 import { CountBadge, EmptyState, Screen, SectionHeading } from "@/components/Screen";
 import { StatCard, StatRow } from "@/components/StatCard";
 import { formatHoursSv, formatMonthNameSv, projectLabel } from "@/lib/format";
-import { getHomeStats, getOngoingProjects } from "@/lib/queries";
+import { ArbetareHem } from "@/components/ArbetareHem";
+import { getArbetareHem, getHomeStats, getOngoingProjects } from "@/lib/queries";
+import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/useQuery";
 
 /**
@@ -26,18 +28,43 @@ import { useQuery } from "@/lib/useQuery";
  * a page that fills in half at a time reads as a page that is broken.
  */
 export default function Home() {
+  const { roll, arbetareId, rollLoading } = useAuth();
+  // Okand roll raknas som arbetare, samma hallning som overallt annars: den som
+  // fallit ur kontotabellen ska se mindre, inte mer.
+  const arArbetare = !rollLoading && roll !== "arbetsledare";
+
   const overview = useQuery(async () => {
+    // Arbetarens Hem laser BARA hens egna pass. Att stalla ledarens fragor och
+    // sedan gomma svaren hade betytt att foretagets totala timmar anda hamtades
+    // till en telefon som inte ska visa dem.
+    if (arArbetare) {
+      const mitt = arbetareId ? await getArbetareHem(arbetareId) : null;
+      return { mitt, stats: null, ongoingProjects: null };
+    }
     const [stats, ongoingProjects] = await Promise.all([
       getHomeStats(),
       getOngoingProjects(),
     ]);
-    return { stats, ongoingProjects };
-  }, []);
+    return { mitt: null, stats, ongoingProjects };
+  }, [arArbetare, arbetareId ?? "", rollLoading]);
 
   return (
     <Screen tone="photo" eyebrow="Översikt" hero title={<>Bella<br />Service</>}>
       <Query state={overview}>
-        {({ stats, ongoingProjects }) => (
+        {({ mitt, stats, ongoingProjects }) =>
+          stats === null || ongoingProjects === null ? (
+            mitt === null ? (
+              /* Arbetare utan arbetarrad — ett kontorskonto som inte ar
+                 arbetsledare. Ingen egen dag att visa, och inga av ledarens
+                 siffror att visa i stallet. */
+              <EmptyState
+                title="Ingenting att visa har an."
+                hint="Kontot ar varken kopplat till en arbetare eller satt som arbetsledare. Sag till den som skapade det."
+              />
+            ) : (
+              <ArbetareHem data={mitt} />
+            )
+          ) : (
           <>
             {/* Row 2: three stat tiles plus the add-worker tile. Four equal
                 columns, all four rendered by StatCard, so the tiles are the same
@@ -112,7 +139,8 @@ export default function Home() {
               )}
             </section>
           </>
-        )}
+          )
+        }
       </Query>
     </Screen>
   );

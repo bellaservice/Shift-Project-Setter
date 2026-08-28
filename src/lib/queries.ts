@@ -8,6 +8,7 @@ import {
   stockholmToday,
 } from "@/lib/format";
 import type {
+  ArbetareHem,
   ArbetsdagbokData,
   ArbetsdagbokDay,
   Arende,
@@ -1231,4 +1232,77 @@ export async function getMinaPassAttStampla(
       clockOut: s.clock_out_time,
     };
   });
+}
+
+/**
+ * Arbetarens Hem-oversikt.
+ *
+ * Tva fragor i en: vad ska jag stampla pa, och hur mycket har jag fatt
+ * bekraftat den har manaden. Bada handlar bara om den inloggade — `worker_id`
+ * filtreras i appen, precis som i getMinaPassAttStampla, eftersom SELECT pa
+ * shifts ar oppet for alla inloggade medan SKRIVNINGARNA ar lasta till egen rad.
+ */
+export async function getArbetareHem(arbetareId: string): Promise<ArbetareHem> {
+  const idag = stockholmToday();
+  const igar = addDays(idag, -1);
+  const monthStart = stockholmMonthStart();
+  const monthEnd = nextMonthStart(monthStart);
+
+  const [oppnaResult, manadResult] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select("id, shift_date, clock_in_time, clock_out_time, projects!inner(name, address, deleted_at)")
+      .eq("worker_id", arbetareId)
+      .eq("status", "open")
+      .gte("shift_date", igar)
+      .lte("shift_date", idag)
+      .is("projects.deleted_at", null)
+      .order("shift_date", { ascending: true })
+      .order("id", { ascending: true }),
+    // Bara bekraftade: `hours` ar null tills arbetsledaren satt den, och en
+    // manadssumma far inte bygga pa siffror som annu inte finns.
+    supabase
+      .from("shifts")
+      .select("hours, projects!inner(deleted_at)")
+      .eq("worker_id", arbetareId)
+      .eq("status", "confirmed")
+      .gte("shift_date", monthStart)
+      .lt("shift_date", monthEnd)
+      .is("projects.deleted_at", null),
+  ]);
+
+  const error = oppnaResult.error ?? manadResult.error;
+  if (error) {
+    throw new Error(`Kunde inte lasa din oversikt: ${error.message}`, {
+      cause: error,
+    });
+  }
+
+  const oppna: StamplaPass[] = (oppnaResult.data ?? []).map((s) => {
+    const project = s.projects as unknown as {
+      name: string | null;
+      address: string;
+    } | null;
+    return {
+      id: s.id,
+      shiftDate: s.shift_date,
+      projectName: project ? projectLabel(project) : "Okant project",
+      clockIn: s.clock_in_time,
+      clockOut: s.clock_out_time,
+    };
+  });
+
+  const manad = manadResult.data ?? [];
+
+  return {
+    // Ett pagaende pass ar instamplat men inte utstamplat. Fler an ett ska inte
+    // kunna finnas, men `find` tar det forsta i stallet for att lita pa det.
+    pagaende: oppna.find((p) => p.clockIn !== null && p.clockOut === null) ?? null,
+    attStampla: oppna.filter((p) => p.clockIn === null),
+    timmarDennaManad: roundHours(
+      manad.reduce((sum, s) => sum + hoursForSum(s.hours), 0)
+    ),
+    passDennaManad: manad.length,
+    monthStart,
+  };
 }

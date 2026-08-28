@@ -424,3 +424,27 @@ export type StamplaPass = {
   clockIn: string | null;
   clockOut: string | null;
 };
+
+/**
+ * Arbetarens egen oversikt pa Hem.
+ *
+ * Hem var fram till nu en enda skarm for alla: foretagets totala timmar,
+ * antalet aktiva project, och knappar for att logga project. Ingenting av det
+ * angar en arbetare, och halva det far hen inte ens rora. Den har typen ar
+ * arbetarens svar pa samma fraga skarmen alltid stallt — "vad ar pa gang just
+ * nu" — fast om hens egen dag.
+ */
+export type ArbetareHem = {
+  /** Passet som pagar just nu: instamplat men inte utstamplat. Null annars. */
+  pagaende: StamplaPass | null;
+  /** Dagens och gardagens pass som annu gar att stampla pa, tidigast forst. */
+  attStampla: StamplaPass[];
+  /** Bekraftade timmar den har manaden. Obekraftade raknas inte — de ar inte
+   *  lon an, och en siffra som krymper nar arbetsledaren rattar vore varre an
+   *  ingen siffra alls. */
+  timmarDennaManad: number;
+  /** Bekraftade pass den har manaden. */
+  passDennaManad: number;
+  /** 'YYYY-MM-01' — manaden siffrorna galler, sa etiketten kan namna den. */
+  monthStart: string;
+};
