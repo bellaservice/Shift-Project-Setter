@@ -7,22 +7,18 @@ import { ChevronRight } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
 
 /**
- * The four destinations the menu offers. Deliberately not every screen in the
- * app: Logga Project and Logga Timmar have their own full-width buttons on Home,
- * so listing them here would only duplicate what is already on screen. "Hem" is
- * what gets you back once you are inside one of the list pages.
+ * Menyn ar avsiktligt kortare an appen.
  *
- * Kalendern is here rather than on Home because it is a place and not an action.
- * The two buttons on Home make something; this one is where you go to look — at
- * a month, at a day, at what a Tuesday actually held. It sits directly under
- * "Hem" because it is the second answer to "what is going on right now", and the
- * first one that can answer it for a day that is not today.
+ * Varje roll har ett par saker som ar dess arbete: arbetaren stamplar sina
+ * pass, arbetsledaren lagger ut pass och bekraftar dem. Allt annat appen kan —
+ * Kalendern, Alla Project, Alla Arbetare, Arbetsdagboken — ar kvar och nas via
+ * sin adress eller via kugghjulet, men star inte har.
  *
- * Papperskorgen is deliberately NOT here — it lives behind the cog on the right
- * (SettingsMenu). This menu is the work you are doing; that one is the app.
- */
-/**
- * `bara` staller raden under en roll. Utelamnad = alla ser den.
+ * Skalet ar att en meny med sju rader gor de tva som ar dagens arbete till tva
+ * av sju. Det som ar borta ar borta ur MENYN, inte ur appen: ingen rutt och
+ * ingen kod har tagits bort, sa en rad hittar tillbaka den dagen den behovs.
+ *
+ * `bara` staller en rad under en roll. Utelamnad = alla ser den.
  *
  * ⚠️ Att gomma en rad ar artighet, inte sakerhet. Adressen gar att skriva i
  * falten anda, och webblasaren kan tala med PostgREST utan att ga via nagon av
@@ -31,16 +27,13 @@ import { useAuth } from "@/lib/auth";
  */
 const NAV: { href: string; label: string; bara?: "arbetsledare" | "arbetare" }[] = [
   { href: "/", label: "Hem" },
-  { href: "/kalender", label: "Kalender" },
   // Arbetarens enda handling i appen, och darfor hogt upp: den som ska stampla
   // in star oftast i en port med telefonen i ena handen.
   { href: "/stampla", label: "Stampla", bara: "arbetare" },
+  // Arbetsledarens tva. Lagga ut pass, och bekrafta dem nar de ar gjorda —
+  // ingenting annat ar hens arbete i appen an sa lange.
   { href: "/skapa-pass", label: "Skapa Pass", bara: "arbetsledare" },
   { href: "/bekrafta", label: "Bekrafta Pass", bara: "arbetsledare" },
-  { href: "/alla-project", label: "Alla Project" },
-  // Rostern med personnummer och kontonummer. En arbetare ser anda bara sin
-  // egen rad (workers_select_egen), sa listan vore en sida med en person pa.
-  { href: "/alla-arbetare", label: "Alla Arbetare", bara: "arbetsledare" },
 ];
 
 /** Vilken av de tre man star pa. Exakt matchning for Hem, prefix for de andra,

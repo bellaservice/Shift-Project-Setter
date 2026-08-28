@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth";
 
 /**
  * Vad kugghjulet innehaller: det som handlar om appen och foretaget snarare an
@@ -24,6 +25,7 @@ const SETTINGS_NAV = [
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { roll, rollLoading } = useAuth();
 
   useEffect(() => {
     if (!open) return;
@@ -89,6 +91,29 @@ export function SettingsMenu() {
           open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"
         }`}
       >
+        {/* Vilken roll man ar inne som, overst i panelen.
+
+            Rollen avgor vad hela appen visar, och den gar att byta — sa den som
+            undrar varfor en knapp saknas ska kunna fa svaret utan att gissa.
+            Det har ar det enda stallet i appen dar den star skriven.
+
+            En rubrik och inte en menyrad: det ar en upplysning, inte nagot att
+            trycka pa. Rollen byts i Installningar > Konto. */}
+        <div className="border-b border-night-line px-4 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">
+            Inloggad som
+          </p>
+          <p className="mt-0.5 text-sm font-bold text-night-accent">
+            {rollLoading
+              ? "…"
+              : roll === "arbetsledare"
+                ? "Arbetsledare"
+                : roll === "arbetare"
+                  ? "Arbetare"
+                  : "Ingen roll"}
+          </p>
+        </div>
+
         <div className="divide-y divide-night-line">
           {SETTINGS_NAV.map((item) => {
             // Bara till `aria-current`: panelen markerar inte den aktuella
