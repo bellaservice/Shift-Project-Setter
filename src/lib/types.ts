@@ -423,6 +423,13 @@ export type StamplaPass = {
   projectName: string;
   clockIn: string | null;
   clockOut: string | null;
+  /**
+   * Det PLANERADE spannet, 'HH:MM:SS' eller null — det arbetsledaren skrev in
+   * pa Skapa Pass. Sager nar passet ska boria, inte nar det borjade: det
+   * senare star i `clockIn`.
+   */
+  startTime: string | null;
+  endTime: string | null;
 };
 
 /**

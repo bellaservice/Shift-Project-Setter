@@ -1206,7 +1206,7 @@ export async function getMinaPassAttStampla(
 
   const { data, error } = await supabase
     .from("shifts")
-    .select("id, shift_date, clock_in_time, clock_out_time, projects!inner(name, address, deleted_at)")
+    .select("id, shift_date, start_time, end_time, clock_in_time, clock_out_time, projects!inner(name, address, deleted_at)")
     .eq("worker_id", arbetareId)
     .eq("status", "open")
     .gte("shift_date", igar)
@@ -1230,6 +1230,8 @@ export async function getMinaPassAttStampla(
       projectName: project ? projectLabel(project) : "Okant project",
       clockIn: s.clock_in_time,
       clockOut: s.clock_out_time,
+      startTime: s.start_time,
+      endTime: s.end_time,
     };
   });
 }
@@ -1251,7 +1253,7 @@ export async function getArbetareHem(arbetareId: string): Promise<ArbetareHem> {
   const [oppnaResult, manadResult] = await Promise.all([
     supabase
       .from("shifts")
-      .select("id, shift_date, clock_in_time, clock_out_time, projects!inner(name, address, deleted_at)")
+      .select("id, shift_date, start_time, end_time, clock_in_time, clock_out_time, projects!inner(name, address, deleted_at)")
       .eq("worker_id", arbetareId)
       .eq("status", "open")
       .gte("shift_date", igar)
@@ -1289,6 +1291,8 @@ export async function getArbetareHem(arbetareId: string): Promise<ArbetareHem> {
       projectName: project ? projectLabel(project) : "Okant project",
       clockIn: s.clock_in_time,
       clockOut: s.clock_out_time,
+      startTime: s.start_time,
+      endTime: s.end_time,
     };
   });
 

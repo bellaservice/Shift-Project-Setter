@@ -62,7 +62,7 @@ export default function Home() {
                 hint="Kontot ar varken kopplat till en arbetare eller satt som arbetsledare. Sag till den som skapade det."
               />
             ) : (
-              <ArbetareHem data={mitt} />
+              <ArbetareHem data={mitt} onStamplat={overview.reload} />
             )
           ) : (
           <>
@@ -93,8 +93,14 @@ export default function Home() {
               />
             </StatRow>
 
-            {/* Rows 3 and 4: the two primary actions, full width and stacked. */}
+            {/* De primara handlingarna, i full bredd och staplade.
+
+                "Skapa Pass" ligger forst av de tre: det ar den enda som handlar
+                om arbete som ska HANDA. De tva andra bokfor sadant som redan ar
+                gjort, och den ordningen — framat forst, bakat sedan — ar hur
+                arbetsledarens dag faktiskt ser ut. */}
             <div className="flex flex-col gap-2.5">
+              <ActionRow href="/skapa-pass" label="Skapa Pass" />
               <ActionRow href="/logga-project" label="Logga Project" />
               <ActionRow href="/logga-timmar" label="Logga Timmar" />
             </div>
