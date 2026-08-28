@@ -84,7 +84,7 @@ function PassRad({
 }
 
 export default function StamplaPage() {
-  const { arbetareId, rollLoading } = useAuth();
+  const { roll, arbetareId, rollLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -126,11 +126,20 @@ export default function StamplaPage() {
       >
         <EmptyState
           title="Det har kontot ar inte kopplat till nagon arbetare."
-          hint="Stamplingen hor till den som gar passen. Ett konto for kontoret har inga egna pass att stampla pa."
+          hint={
+            roll === "arbetsledare"
+              ? "Stamplingen hor till den som gar passen — du bekraftar dem i stallet. Vill du lagga ut ett pass gor du det har."
+              : "Stamplingen hor till den som gar passen. Ett konto for kontoret har inga egna pass att stampla pa."
+          }
+          /* Vidare till Skapa Pass och inte hem. Den som star har har oftast
+             kommit for att det INTE fanns nagra pass, och da ar vagen framat
+             att lagga ut ett — inte att backa ut till startsidan. */
           action={
-            <ButtonLink href="/" size="md">
-              Hem
-            </ButtonLink>
+            roll === "arbetsledare" ? (
+              <ButtonLink href="/skapa-pass" size="md">
+                Skapa Pass
+              </ButtonLink>
+            ) : undefined
           }
         />
       </Screen>
@@ -152,11 +161,20 @@ export default function StamplaPage() {
           rader.length === 0 ? (
             <EmptyState
               title="Inga pass att stampla pa just nu."
-              hint="Har visas dina pass for idag och igar. Ar ett pass slut och utstamplat ligger det hos arbetsledaren for bekraftelse."
+              hint={
+                roll === "arbetsledare"
+                  ? "Har visas pass for idag och igar. Finns inga alls ar de troligen inte utlagda an — lagg ut dem med Skapa Pass."
+                  : "Har visas dina pass for idag och igar. Saknas ett du ska ga — sag till din arbetsledare."
+              }
+              /* Ingen Hem-knapp. Den som redan star pa Stampla ska inte behova
+                 lamna skarmen for att komma vidare, och for en arbetare finns
+                 ingenting harifran att gora at saken. */
               action={
-                <ButtonLink href="/" size="md">
-                  Hem
-                </ButtonLink>
+                roll === "arbetsledare" ? (
+                  <ButtonLink href="/skapa-pass" size="md">
+                    Skapa Pass
+                  </ButtonLink>
+                ) : undefined
               }
             />
           ) : (
