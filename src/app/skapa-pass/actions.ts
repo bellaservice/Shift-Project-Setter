@@ -72,9 +72,33 @@ function plannedTime(
   return `${match[1]}:${match[2]}:${match[3] ?? "00"}`;
 }
 
+/**
+ * Passets PLANERADE timmar — det som ska betalas, inte spannet.
+ *
+ * Frivilligt. Lamnas det tomt fods passet med `hours` null, precis som forr,
+ * och arbetsledaren satter siffran vid bekraftelsen.
+ *
+ * ⚠️ Vardet skrivs i `shifts.hours`, samma kolumn som bekraftelsen sedan
+ * skriver i. Det ar avsiktligt: `hours` ar "vad passet ar vart i timmar", och
+ * `status` sager om siffran ar planerad eller slutgiltig. Priset ar att varje
+ * SUMMA over hours maste filtrera pa status = 'confirmed', annars raknas
+ * planerad tid som arbetad. Alla summor i queries.ts gor det.
+ */
+function plannedHours(value: FormDataEntryValue | null): number | null {
+  const raw = String(value ?? "").trim().replace(",", ".");
+  if (raw === "") return null;
+
+  const timmar = Number(raw);
+  if (!Number.isFinite(timmar)) throw new Error("Timmarna maste vara ett tal");
+  if (timmar < 0) throw new Error("Timmarna kan inte vara negativa");
+  if (timmar > 24) throw new Error("Ett pass kan inte vara langre an 24 timmar");
+  return timmar;
+}
+
 export async function skapaPass(formData: FormData): Promise<string> {
   const dagar = shiftDates(formData);
   const projectId = requiredString(formData.get("project_id"), "Project");
+  const timmar = plannedHours(formData.get("timmar"));
 
   const start_time = plannedTime(formData.get("start_time"), "Pass start");
   const end_time = plannedTime(formData.get("end_time"), "Pass slut");
@@ -145,9 +169,12 @@ export async function skapaPass(formData: FormData): Promise<string> {
       project_id: projectId,
       worker_id,
       shift_date,
-      // Schemalagt, inte pabörjat: ingen stampling, inga timmar.
+      // Schemalagt, inte pabörjat: ingen stampling.
       status: "open",
-      hours: null,
+      // Det planerade timtalet, eller null nar arbetsledaren lamnat det oppet.
+      // Siffran blir slutgiltig forst vid bekraftelsen — fram till dess sager
+      // `status` att den ar en plan.
+      hours: timmar,
       start_time,
       end_time,
     }))

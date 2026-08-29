@@ -7,6 +7,7 @@ import { FieldHint, FieldLabel } from "@/components/Field";
 import { FormError } from "@/components/FormError";
 import { FormSection } from "@/components/Panel";
 import { TimeRangeSelect } from "@/components/TimeWheelSelect";
+import { TimmarVal } from "@/components/TimmarVal";
 import { WorkerRows } from "@/components/WorkerRows";
 import { formatWeekdayDateSv, projectLabel } from "@/lib/format";
 import { useNavigatingAction } from "@/lib/useNavigatingAction";
@@ -40,6 +41,7 @@ export function SkapaPassForm({
   const [projectId, setProjectId] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [timmar, setTimmar] = useState("");
 
   return (
     <form action={submit} className="flex flex-col gap-3.5">
@@ -118,6 +120,21 @@ export function SkapaPassForm({
           Frivilligt, och samma tider pa alla valda dagar. Tiderna sager nar
           passet ska börja och sluta — arbetaren stamplar anda sina egna.
         </FieldHint>
+
+        <div className="mt-3.5">
+          <FieldLabel>Timmar</FieldLabel>
+          <TimmarVal
+            name="timmar"
+            label="Passets betalda timmar"
+            value={timmar}
+            onChange={setTimmar}
+          />
+          <FieldHint>
+            Timmarna som betalas — inte spannet ovan. Ar en timme obetald rast ar
+            07:00–16:00 ett attatimmarspass. Arbetsledaren kan andra siffran nar
+            passet bekraftas.
+          </FieldHint>
+        </div>
       </FormSection>
 
       <FormSection title="Arbetare">

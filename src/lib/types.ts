@@ -397,7 +397,14 @@ export type BekraftaShift = {
   clockEditedAt: string | null;
   /** Timmarna ur klockan. Null nar passet inte ar utstamplat. Underlag, aldrig lon. */
   calculatedHours: number | null;
-  /** Alltid null i kon — ett pass med bekraftade timmar ar bekraftat. */
+  /**
+   * Det PLANERADE timtalet fran Skapa Pass, eller null nar arbetsledaren
+   * lamnade det oppet.
+   *
+   * Aldrig ett bekraftat varde: ett bekraftat pass har lamnat kon. Siffran ar
+   * ett forslag att bekrafta eller andra, och den fyller Timmar-faltet i
+   * bekraftelseraden nar den finns.
+   */
   hours: number | null;
 };
 

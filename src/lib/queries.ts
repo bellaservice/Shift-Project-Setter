@@ -100,6 +100,9 @@ export async function getHomeStats(): Promise<HomeStats> {
     supabase
       .from("shifts")
       .select("hours, projects!inner(deleted_at), workers!inner(deleted_at)")
+      // Bara bekraftade timmar summeras. Ett schemalagt pass kan numera bara
+      // ett PLANERAT timtal (se Skapa Pass), och en plan ar inte arbetad tid.
+      .eq("status", "confirmed")
       .is("projects.deleted_at", null)
       .is("workers.deleted_at", null),
     supabase
@@ -180,6 +183,7 @@ export async function getOngoingProjects(): Promise<OngoingProject[]> {
     supabase
       .from("shifts")
       .select("project_id, hours, workers!inner(deleted_at)")
+      .eq("status", "confirmed")
       .in("project_id", projectIds)
       .is("workers.deleted_at", null),
   ]);
@@ -341,6 +345,7 @@ export async function getProjectsByStartMonth(): Promise<ProjectMonthGroup[]> {
     supabase
       .from("shifts")
       .select("project_id, hours, workers!inner(deleted_at)")
+      .eq("status", "confirmed")
       .is("workers.deleted_at", null),
   ]);
 
@@ -400,6 +405,7 @@ export async function getWorkerList(): Promise<WorkerListItem[]> {
     supabase
       .from("shifts")
       .select("worker_id, project_id, hours, projects!inner(deleted_at)")
+      .eq("status", "confirmed")
       .is("projects.deleted_at", null),
   ]);
 
@@ -464,7 +470,7 @@ export async function getArbetsdagbokData(
       .order("service_name", { ascending: true }),
     supabase
       .from("shifts")
-      .select("worker_id, shift_date, hours, start_time, end_time, workers!inner(deleted_at)")
+      .select("worker_id, shift_date, hours, status, start_time, end_time, workers!inner(deleted_at)")
       .eq("project_id", projectId)
       .is("workers.deleted_at", null)
       // Chronological: the document reads as a diary, oldest day first.
@@ -507,7 +513,16 @@ export async function getArbetsdagbokData(
   let obekraftade = 0;
   for (const s of shifts) {
     const hours = readHours(s.hours);
-    if (hours === null) {
+    // `status` avgor, inte `hours is null`.
+    //
+    // De tva sammanfoll fram tills Skapa Pass borjade skriva ett PLANERAT
+    // timtal pa passet: sedan dess har ett schemalagt pass bade ett timtal och
+    // ett obekraftat lage, och den gamla regeln hade skrivit in det i
+    // dokumentet som om nagon redan arbetat det. `hours === null` star kvar som
+    // balte: ett bekraftat pass utan timtal ar omojligt (constraintet
+    // shifts_confirmed_has_hours), men dokumentet ska inte vara det som
+    // upptacker att det anda hant.
+    if (s.status !== "confirmed" || hours === null) {
       obekraftade += 1;
       continue;
     }

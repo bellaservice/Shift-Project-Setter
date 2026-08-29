@@ -124,9 +124,22 @@ export function BekraftaRow({
   // arbetsledarens siffra och far skilja sig fran spannet. En obetald rast ar
   // det normala fallet, inte ett fel att ratta (samma resonemang som i
   // PassTiderRows).
-  const [timmar, setTimmar] = useState(
-    shift.calculatedHours === null ? "" : formatHoursSv(shift.calculatedHours)
-  );
+  /**
+   * Forslaget i Timmar-faltet, i fallande ordning av vem som vet bast:
+   *
+   *   1. Det PLANERADE timtalet, om arbetsledaren satte ett pa Skapa Pass. Det
+   *      ar vad man kom overens om, och det tar redan hansyn till obetald rast.
+   *   2. Annars klockans timmar — spannet mellan stamplingarna.
+   *   3. Annars tomt, och arbetsledaren far fylla i sjalv.
+   *
+   * Bara ett utgangslage: faltet ar ett falt, och siffran som star kvar nar
+   * Bekrafta trycks ar den som betalas.
+   */
+  const [timmar, setTimmar] = useState(() => {
+    if (shift.hours !== null) return formatHoursSv(shift.hours);
+    if (shift.calculatedHours !== null) return formatHoursSv(shift.calculatedHours);
+    return "";
+  });
 
   const justerat = spannTimmar(clockIn, clockOut);
   const harStampling = shift.clockIn !== null;

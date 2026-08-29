@@ -53,16 +53,35 @@ export function ManadsVal({
   const [ar, setAr] = useState(() => Number(idag.slice(0, 4)));
   const [manad, setManad] = useState(() => Number(idag.slice(5, 7)));
 
-  // Laget for den pagaende dragningen. `null` = ingen dragning pagar.
+  // Laget for den pagaende dragningen. `null` = laget ar annu inte satt.
   const drag = useRef<"valj" | "avvalj" | null>(null);
+  // Om fingret ar nere. Skilt fran `drag`, eftersom en gest kan borja pa en
+  // slackt dag och forst senare na en valbar.
+  const nere = useRef(false);
 
   const maxDag = daysInMonth(ar, manad);
   const lead = weekdayIndex(datum(ar, manad, 1));
   const rader = Math.ceil((lead + maxDag) / 7);
   const trail = rader * 7 - lead - maxDag;
 
+  /**
+   * Dagar som redan varit gar inte att valja.
+   *
+   * Ett pass ar en bestallning av arbete som ska hanta. Att lagga ut ett pa en
+   * dag som passerat ar antingen ett feltryck eller ett forsok att bokfora i
+   * efterhand — och det senare har en egen vag in i appen (Logga Timmar), dar
+   * timmarna skrivs direkt och passet aldrig behover stamplas.
+   *
+   * Idag ar tillatet. Ett pass som laggs ut pa morgonen och gas samma dag ar
+   * det normala, inte undantaget.
+   */
+  function harVarit(dag: string): boolean {
+    return dag < idag;
+  }
+
   function applicera(dag: string) {
     if (drag.current === null) return;
+    if (harVarit(dag)) return;
     const har = valda.has(dag);
     if (drag.current === "valj" && har) return;
     if (drag.current === "avvalj" && !har) return;
@@ -79,17 +98,44 @@ export function ManadsVal({
     return el?.closest<HTMLElement>("[data-dag]")?.dataset.dag ?? null;
   }
 
+  /**
+   * Startar dragningen pa den forsta VALBARA dagen fingret nar — inte
+   * nodvandigtvis den det landade pa.
+   *
+   * En vecka som borjar i det passerade och slutar i framtiden ar det normala
+   * fallet den har manaden: mandagen ar borta, onsdagen ar kvar. Lade man
+   * fingret pa mandagen och drog hogerut hande ingenting alls, eftersom laget
+   * aldrig hann sattas. Nu vantar gesten in den forsta dag som gar att mala.
+   */
   function borja(e: React.PointerEvent) {
+    nere.current = true;
     const dag = dagUnder(e);
     if (!dag) return;
     drag.current = valda.has(dag) ? "avvalj" : "valj";
     applicera(dag);
   }
 
+  function ror(e: React.PointerEvent) {
+    if (!nere.current) return;
+    const dag = dagUnder(e);
+    if (!dag) return;
+    // Fingret har natt sin forsta valbara dag: nu avgors laget.
+    if (drag.current === null) {
+      drag.current = valda.has(dag) ? "avvalj" : "valj";
+    }
+    applicera(dag);
+  }
+
+  function sluta() {
+    nere.current = false;
+    drag.current = null;
+  }
+
   function bytManad(steg: number) {
     // Dragningen avbryts nar manaden byts: ett finger som halls nere over en
     // pil ska inte fortsatta mala i nasta manad.
     drag.current = null;
+    nere.current = false;
     const m = manad + steg;
     if (m < 1) {
       setAr(ar - 1);
@@ -106,11 +152,15 @@ export function ManadsVal({
     <div className="select-none">
       {/* Manadsraden. Pilarna ar 44px trots att de ritar en liten symbol. */}
       <div className="mb-3 flex items-center justify-between gap-2">
+        {/* Bakatpilen slacks pa den manad vi ar i. Manader som helt passerat
+            innehaller ingenting valbart, sa att kunna bladdra dit vore att
+            erbjuda en resa till en tom sida. */}
         <button
           type="button"
           aria-label="Foregaende manad"
+          disabled={ar === Number(idag.slice(0, 4)) && manad === Number(idag.slice(5, 7))}
           onClick={() => bytManad(-1)}
-          className="glass flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold text-white active:bg-white/20"
+          className="glass flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold text-white active:bg-white/20 disabled:text-white/25"
         >
           ‹
         </button>
@@ -145,14 +195,10 @@ export function ManadsVal({
         aria-label="Valj dagar"
         className="grid touch-none grid-cols-7 gap-1"
         onPointerDown={borja}
-        onPointerMove={(e) => {
-          if (drag.current === null) return;
-          const dag = dagUnder(e);
-          if (dag) applicera(dag);
-        }}
-        onPointerUp={() => (drag.current = null)}
-        onPointerCancel={() => (drag.current = null)}
-        onPointerLeave={() => (drag.current = null)}
+        onPointerMove={ror}
+        onPointerUp={sluta}
+        onPointerCancel={sluta}
+        onPointerLeave={sluta}
       >
         {/* Foregaende manads sista dagar, som utfyllnad. Inte valbara: den som
             vill lagga ett pass i forra manaden byter manad. */}
@@ -165,23 +211,35 @@ export function ManadsVal({
           const dag = datum(ar, manad, d);
           const vald = valda.has(dag);
           const arIdag = dag === idag;
+          const passerad = harVarit(dag);
           return (
             <button
               key={dag}
               type="button"
-              data-dag={dag}
+              /* Passerade dagar far INGET data-dag. Dragningen letar upp dagar
+                 med just det attributet, sa en dag utan det ar osynlig for
+                 gesten — fingret kan svepa rakt over den utan att den fastnar.
+                 `disabled` stanger den for tangentbord och skarmlasare. */
+              data-dag={passerad ? undefined : dag}
+              disabled={passerad}
               role="checkbox"
               aria-checked={vald}
-              aria-label={`${d} ${WEEKDAY_LONG[(lead + d - 1) % 7]}`}
+              aria-label={
+                passerad
+                  ? `${d} ${WEEKDAY_LONG[(lead + d - 1) % 7]} — har varit`
+                  : `${d} ${WEEKDAY_LONG[(lead + d - 1) % 7]}`
+              }
               className="flex min-h-11 items-center justify-center rounded-xl outline-none"
             >
               <span
                 className={`flex aspect-square w-full max-w-11 items-center justify-center rounded-xl text-[15px] tabular-nums transition-colors duration-150 ease-out motion-reduce:transition-none ${
-                  vald
-                    ? "bg-night-accent font-extrabold text-black"
-                    : arIdag
-                      ? "bg-white/10 font-bold text-white ring-1 ring-inset ring-night-accent/50"
-                      : "text-white/80"
+                  passerad
+                    ? "text-white/20"
+                    : vald
+                      ? "bg-night-accent font-extrabold text-black"
+                      : arIdag
+                        ? "bg-white/10 font-bold text-white ring-1 ring-inset ring-night-accent/50"
+                        : "text-white/80"
                 }`}
               >
                 {d}
