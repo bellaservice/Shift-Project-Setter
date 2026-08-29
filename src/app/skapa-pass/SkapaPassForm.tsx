@@ -2,57 +2,74 @@
 
 import { useState } from "react";
 import { Button } from "@/components/Button";
-import { DateSelect } from "@/components/DateSelect";
+import { Dropdown } from "@/components/Dropdown";
 import { FieldHint, FieldLabel } from "@/components/Field";
 import { FormError } from "@/components/FormError";
 import { FormSection } from "@/components/Panel";
 import { TimeRangeSelect } from "@/components/TimeWheelSelect";
 import { WorkerRows } from "@/components/WorkerRows";
-import { Dropdown } from "@/components/Dropdown";
-import { projectLabel } from "@/lib/format";
+import { formatWeekdayDateSv, projectLabel } from "@/lib/format";
 import { useNavigatingAction } from "@/lib/useNavigatingAction";
 import type { Project, Worker } from "@/lib/types";
 import { skapaPass } from "./actions";
 
 /**
- * Formularet som lagger ut pass i forvag.
+ * Steg 2: vad passen ska innehalla.
  *
- * Nastan samma falt som Logga Timmar, med ETT borttaget och det ar det som gor
- * hela skillnaden: har finns ingen ruta for timmar. Ett pass som ska hanta har
- * inga arbetade timmar, och att erbjuda faltet hade inbjudit till att fylla i
- * det -- varpa passet fott sig sjalvt en siffra ingen arbetat ihop.
+ * Dagarna ar redan valda i kalendern och kommer hit som en lista. Formularet
+ * fylls i EN gang och galler alla — det ar hela vinsten med kalendersteget, och
+ * skalet till att dagarna star uppraknade overst: den som fyller i ska se vad
+ * hen fyller i FOR.
  *
- * Falten aterbrukas fran Logga Timmar (DateSelect, WorkerRows). Det ar med
- * flit: den som kan det ena formularet ska kanna igen sig i det andra, och
- * skillnaden mellan dem ska vara innehallet och inte utseendet.
- *
- * Projectvaljaren ar dock EGEN — se kommentaren vid <Dropdown> nedan.
+ * Inget timfalt, precis som forr: ett pass som ska handa har inga arbetade
+ * timmar an, och en nolla hade betytt "arbetaren var har och jobbade inte".
  */
 export function SkapaPassForm({
   projects,
   workers,
-  selectedProjectId,
-  defaultDate,
+  dagar,
+  onTillbaka,
 }: {
   projects: Project[];
   workers: Worker[];
-  selectedProjectId: string;
-  defaultDate?: string;
+  /** Valda dagar, 'YYYY-MM-DD', stigande. */
+  dagar: string[];
+  onTillbaka: () => void;
 }) {
   const { submit, error, pending } = useNavigatingAction(skapaPass);
-
-  // `selectedProjectId` ar bara utgangslaget — kommer man hit med ?project=
-  // star det redan valt. Darefter bar formularet sitt eget varde.
-  const [projectId, setProjectId] = useState(selectedProjectId);
-
-  // Planerade tider, lokalt burna. Frivilliga -- se hinten nedan.
+  const [projectId, setProjectId] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
 
   return (
     <form action={submit} className="flex flex-col gap-3.5">
-      <FormSection title="Nar och var">
-        <DateSelect defaultDate={defaultDate} />
+      {/* Dagarna foljer med som dolda falt. Kalendern ager valet; det har ar
+          bara hur det tar sig till atgarden. */}
+      {dagar.map((d) => (
+        <input key={d} type="hidden" name="datum" value={d} />
+      ))}
+
+      <FormSection title={dagar.length === 1 ? "Vald dag" : `Valda dagar (${dagar.length})`}>
+        <div className="flex flex-wrap gap-1.5">
+          {dagar.map((d) => (
+            <span
+              key={d}
+              className="rounded-lg bg-night-accent/15 px-2.5 py-1 text-xs font-bold text-night-accent"
+            >
+              {formatWeekdayDateSv(d)}
+            </span>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onTillbaka}
+          className="mt-2.5 text-sm font-bold text-night-accent active:text-night-accent/70"
+        >
+          ← Andra dagar
+        </button>
+      </FormSection>
+
+      <FormSection title="Project">
         <div>
           <FieldLabel>
             Project
@@ -60,15 +77,6 @@ export function SkapaPassForm({
               *
             </span>
           </FieldLabel>
-          {/* En vanlig Dropdown med lokalt varde, INTE
-              <LoggaTimmarProjectSelect>. Den senare lagger valet i adressen och
-              gor `router.replace("/logga-timmar")` — den ar hardkodad till sin
-              egen skarm, sa ett projectval har hade slangt ut anvandaren till
-              Logga Timmar med formularet tomt. (Det gjorde den ocksa, tills ett
-              test upptackte det.)
-
-              Skarmen behover inte adressen: till skillnad fran Logga Timmar har
-              den ingen "Senaste Pass"-lista som beror pa valet. */}
           <Dropdown
             name="project_id"
             required
@@ -107,22 +115,26 @@ export function SkapaPassForm({
           }
         />
         <FieldHint>
-          Frivilligt. Tiderna sager nar passet ska börja och sluta — arbetaren
-          stamplar anda sina egna. Fyller du i dem star de som Pass Tider i
-          Arbetsdagboken.
+          Frivilligt, och samma tider pa alla valda dagar. Tiderna sager nar
+          passet ska börja och sluta — arbetaren stamplar anda sina egna.
         </FieldHint>
       </FormSection>
 
       <FormSection title="Arbetare">
-        {/* `hoursLabel={null}`: det ar ekot av timfaltet i Logga Timmar, och
-            det faltet finns inte har. */}
         <WorkerRows workers={workers} hoursLabel={null} />
+        <FieldHint>
+          Varje vald arbetare far ett pass per vald dag.
+        </FieldHint>
       </FormSection>
 
       <FormError message={error} />
 
-      <Button type="submit" disabled={pending} className="mt-1 w-full">
-        {pending ? "Skapar…" : "Skapa Pass"}
+      <Button type="submit" disabled={pending} glow className="mt-1 w-full">
+        {pending
+          ? "Skapar…"
+          : dagar.length === 1
+            ? "Skapa Pass"
+            : `Skapa Pass pa ${dagar.length} dagar`}
       </Button>
     </form>
   );

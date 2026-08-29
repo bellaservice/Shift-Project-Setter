@@ -21,13 +21,34 @@ import { optionalString, requiredString } from "@/lib/formData";
  * pekar ut arbetarna sjalv. Se avsnitt 8.6 i shift-system-spec.md.
  */
 
-/** Datumfaltet skickar tre tal. Samma form som logShifts lasar dem i. */
-function shiftDate(formData: FormData): string {
-  const year = Number(formData.get("year"));
-  const month = Number(formData.get("month"));
-  const day = Number(formData.get("day"));
-  if (!year || !month || !day) throw new Error("Pass Datum kravs");
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+/**
+ * Dagarna som malats i kalendern, som 'YYYY-MM-DD'.
+ *
+ * Flera, inte en: hela poangen med kalendersteget ar att fylla i EN gang och
+ * lagga ut passet pa alla valda dagar. Set:et tar hand om en dag som rakat
+ * skickas tva ganger.
+ *
+ * Formatet kollas har och inte bara i kalendern, eftersom formData ar
+ * webblasarens och inte vart — ett falt gar att andra innan det skickas.
+ */
+function shiftDates(formData: FormData): string[] {
+  const datum = [
+    ...new Set(
+      formData
+        .getAll("datum")
+        .map((v) => String(v).trim())
+        .filter((v) => v !== "")
+    ),
+  ].sort();
+
+  if (datum.length === 0) throw new Error("Valj minst en dag i kalendern");
+
+  for (const d of datum) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(d)) {
+      throw new Error(`"${d}" ar inte ett giltigt datum`);
+    }
+  }
+  return datum;
 }
 
 /**
@@ -52,7 +73,7 @@ function plannedTime(
 }
 
 export async function skapaPass(formData: FormData): Promise<string> {
-  const datum = shiftDate(formData);
+  const dagar = shiftDates(formData);
   const projectId = requiredString(formData.get("project_id"), "Project");
 
   const start_time = plannedTime(formData.get("start_time"), "Pass start");
@@ -86,9 +107,9 @@ export async function skapaPass(formData: FormData): Promise<string> {
    */
   const { data: befintliga, error: kollError } = await supabase
     .from("shifts")
-    .select("worker_id, workers!inner(name)")
+    .select("shift_date, workers!inner(name)")
     .eq("project_id", projectId)
-    .eq("shift_date", datum)
+    .in("shift_date", dagar)
     .neq("status", "confirmed")
     .in("worker_id", workerIds);
 
@@ -99,24 +120,31 @@ export async function skapaPass(formData: FormData): Promise<string> {
   }
 
   if ((befintliga ?? []).length > 0) {
-    const namn = (befintliga ?? [])
-      .map((rad) => {
-        const w = rad.workers as unknown as { name: string } | null;
-        return w?.name ?? "Okand arbetare";
-      })
-      .sort((a, b) => a.localeCompare(b, "sv"));
+    // Namnet OCH dagen, nu nar det kan vara flera dagar pa en gang: "Anna har
+    // redan ett pass" sager inte vilken av de sju dagarna som ar upptagen.
+    const krockar = [
+      ...new Set(
+        (befintliga ?? []).map((rad) => {
+          const w = rad.workers as unknown as { name: string } | null;
+          return `${w?.name ?? "Okand arbetare"} ${rad.shift_date}`;
+        })
+      ),
+    ].sort((a, b) => a.localeCompare(b, "sv"));
+
     throw new Error(
-      namn.length === 1
-        ? `${namn[0]} har redan ett pass pa det har projectet den dagen.`
-        : `Dessa har redan pass pa det har projectet den dagen: ${namn.join(", ")}.`
+      krockar.length === 1
+        ? `${krockar[0]} — det passet finns redan.`
+        : `Dessa pass finns redan: ${krockar.join(", ")}.`
     );
   }
 
-  const { error } = await supabase.from("shifts").insert(
+  // En rad per arbetare och dag. Ett pass pa fem dagar med tre arbetare blir
+  // femton rader, eftersom en rad i shifts ar en persons arbete en dag.
+  const rader = dagar.flatMap((shift_date) =>
     workerIds.map((worker_id) => ({
       project_id: projectId,
       worker_id,
-      shift_date: datum,
+      shift_date,
       // Schemalagt, inte pabörjat: ingen stampling, inga timmar.
       status: "open",
       hours: null,
@@ -125,10 +153,11 @@ export async function skapaPass(formData: FormData): Promise<string> {
     }))
   );
 
+  const { error } = await supabase.from("shifts").insert(rader);
+
   if (error) {
     throw new Error(`Kunde inte skapa passen: ${error.message}`, { cause: error });
   }
 
-  // Tillbaka till skarmen som visar vad som nu ligger ute.
-  return "/skapa-pass?skapat=1";
+  return `/skapa-pass?skapat=${rader.length}`;
 }
