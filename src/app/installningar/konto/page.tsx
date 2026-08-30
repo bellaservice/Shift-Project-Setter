@@ -1,6 +1,7 @@
 import { ActionRow } from "@/components/Panel";
 import { Screen } from "@/components/Screen";
 import { KontoLista } from "./KontoLista";
+import { MittKonto } from "./MittKonto";
 
 export const metadata = { title: "Konto — Bella Service" };
 
@@ -30,7 +31,14 @@ export default function KontoPage() {
       eyebrow="Appen"
       title="Konto"
       back={{ href: "/installningar", label: "Inställningar" }}
-      lead={<ActionRow href="/installningar/konto/nytt" label="Tillverka Konto" />}
+      /* Det egna kontot star fore knappen som tillverkar nagon annans: skarmen
+         borjar med vem man ar och gar sedan vidare till vad man kan gora. */
+      lead={
+        <>
+          <MittKonto />
+          <ActionRow href="/installningar/konto/nytt" label="Tillverka Konto" />
+        </>
+      }
     >
       <KontoLista />
     </Screen>

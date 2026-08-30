@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { User } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
 
 /**
@@ -25,7 +26,7 @@ const SETTINGS_NAV = [
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { roll, rollLoading } = useAuth();
+  const { roll, rollLoading, namn, bild, epost, session, signOut } = useAuth();
 
   useEffect(() => {
     if (!open) return;
@@ -43,29 +44,36 @@ export function SettingsMenu() {
           och gar att trycka pa igen for att stanga. Glascirkel i samma storlek
           som hamburgaren, sa de tva ser ut att hora ihop i stallet for att vara
           tva olika sorters knappar. */}
+      {/* Ansiktet, inte kugghjulet.
+
+          Ett kugghjul sager "appens instalningar". Men det som ligger bakom den
+          har knappen ar numera lika mycket VEM man ar: rollen man arbetar som,
+          kontot, och vagen ut. En profilbild sager det utan ord, och den svarar
+          dessutom pa en fraga en delad telefon staller pa riktigt — ar det jag
+          som ar inloggad? Kugghjulet kunde aldrig svara pa den.
+
+          Ingen rotation nar den oppnas, till skillnad fran kugghjulet: ett
+          ansikte som snurrar ar en leksak. Ringen tanda i amber sager samma sak
+          lugnare. */}
       <button
         type="button"
-        aria-label="Inställningar"
+        aria-label={namn ? `${namn} — konto och inställningar` : "Konto och inställningar"}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((wasOpen) => !wasOpen)}
-        className="glass relative z-50 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-out active:bg-white/20 motion-reduce:transition-none"
+        className={`glass relative z-50 flex h-11 w-11 cursor-pointer items-center justify-center overflow-hidden rounded-full text-white/45 transition duration-200 ease-out active:bg-white/20 motion-reduce:transition-none ${
+          open ? "ring-2 ring-night-accent" : ""
+        }`}
       >
-        <svg
-          aria-hidden
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`h-5 w-5 text-white transition-transform duration-300 ease-out motion-reduce:transition-none ${
-            open ? "rotate-90" : ""
-          }`}
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
+        {bild ? (
+          /* Ingen next/image, av samma skal som Avatar i KontoList: kallan ar
+             profilbilden i Supabase Storage, den ar redan liten, och den visas
+             i 44px. */
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={bild} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <User className="h-5 w-5" />
+        )}
       </button>
 
       {/* Dimmern ar sitt eget lager under panelen, till skillnad fran NavMenu
@@ -103,7 +111,18 @@ export function SettingsMenu() {
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">
             Inloggad som
           </p>
-          <p className="mt-0.5 text-sm font-bold text-night-accent">
+          {/* Namnet forst, sedan adressen, sist rollen.
+
+              Ett konto utan arbetarrad har inget namn — da far adressen vara
+              namnet, precis som i kontolistan, i stallet for att raden star tom
+              och ser trasig ut. */}
+          <p className="mt-1 truncate text-sm font-bold text-white">
+            {namn ?? epost ?? "—"}
+          </p>
+          {namn && epost && (
+            <p className="truncate text-xs text-white/55">{epost}</p>
+          )}
+          <p className="mt-1 text-sm font-bold text-night-accent">
             {rollLoading
               ? "…"
               : roll === "arbetsledare"
@@ -134,6 +153,38 @@ export function SettingsMenu() {
               </Link>
             );
           })}
+        </div>
+
+        {/* Vagen ut, sist och avskild.
+
+            Den fanns inte alls forut: signOut() har legat i auth.tsx sedan
+            inloggningen bygddes utan att nagon knapp nagonsin kallat pa den, sa
+            det enda sattet att byta anvandare var att rensa webblasarens
+            lagring. Pa en telefon som gar mellan tva personer ar det inte ett
+            saknat bekvamlighetsdrag utan en trasig inloggning.
+
+            Under en egen linje och i rott: den ar inte en av de tva
+            destinationerna ovan, den avslutar. Ingen bekraftelsedialog — man
+            oppnar menyn med flit, och det som gar forlorat ar ett tryck pa
+            "Logga in" igen.
+
+            Texten vander pa sig efter sessionen. I praktiken star det alltid
+            "Logga ut", eftersom AuthGate visar inloggningsskarmen i stallet for
+            appen nar sessionen saknas och den har menyn da inte ritas alls. Men
+            knappen ska saga sanningen om det laget den faktiskt ar i, inte
+            forutsatta det. */}
+        <div className="border-t border-night-line">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={async () => {
+              setOpen(false);
+              if (session) await signOut();
+            }}
+            className="flex min-h-11 w-full items-center px-4 py-3 text-sm font-bold text-night-danger transition-colors duration-200 ease-out active:bg-white/10 motion-reduce:transition-none"
+          >
+            {session ? "Logga ut" : "Logga in"}
+          </button>
         </div>
       </nav>
     </div>

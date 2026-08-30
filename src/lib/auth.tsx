@@ -57,6 +57,24 @@ type AuthState = {
    * lasta till egen rad av shifts_update_egen_stampling.
    */
   arbetareId: string | null;
+  /**
+   * Den inloggades namn och profilbild, ur arbetarraden kontot pekar pa.
+   *
+   * De foljer med i SAMMA fraga som rollen i stallet for att hamtas dar de
+   * behovs. Skalet ar att profilbilden numera ar knappen uppe i hogra hornet pa
+   * VARJE skarm: en egen hamtning for den hade blivit en extra fraga per
+   * sidladdning for ett par falt som redan lag i svaret vi anda vantade pa.
+   *
+   * Bada ar null for ett konto utan arbetare — kontorspersonal har en
+   * inloggning men ingen arbetarrad, och da finns varken namn eller bild att
+   * visa. Knappen faller tillbaka pa en siluett.
+   */
+  namn: string | null;
+  bild: string | null;
+  /** Adressen man loggade in med. Ur sessionen, inte ur databasen. */
+  epost: string | null;
+  /** Kontots status ('aktiv', 'avstangd', …), for kortet pa Konto-skarmen. */
+  kontostatus: string | null;
   /** True medan rollen hamtas, sa skarmar kan vanta i stallet for att blinka. */
   rollLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -80,6 +98,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     uid: string;
     roll: Roll | null;
     arbetareId: string | null;
+    namn: string | null;
+    bild: string | null;
+    kontostatus: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -121,7 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let avbruten = false;
     getSupabase()
       .from("accounts")
-      .select("role, worker_id")
+      // `workers(...)` utan `!inner`, av samma skal som i getKonton: ett konto
+      // utan arbetare har ingen rad att joina mot, och ett inner join hade gjort
+      // hela svaret tomt — alltsa slagit ut ROLLEN ocksa, och med den varje
+      // rollberoende skarm. Utan !inner kommer kontot tillbaka med `workers`
+      // tom, vilket ar precis vad vi vill sага: inloggning finns, person saknas.
+      .select("role, worker_id, status, workers(name, profile_picture_url)")
       .eq("id", uid)
       .maybeSingle()
       .then(({ data }) => {
@@ -129,10 +155,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Okand roll blir null, och null behandlas som arbetare av varje
         // anropare. Ett trasigt svar ska inte kunna befordra nagon.
         const raw = data?.role;
+        // PostgREST typar en inbaddad tabell som array. Utan !inner kan den
+        // ocksa vara null eller tom — fallet "konto utan arbetare".
+        const w = (Array.isArray(data?.workers) ? data.workers[0] : data?.workers) as
+          | { name: string | null; profile_picture_url: string | null }
+          | null
+          | undefined;
         setKontouppgifter({
           uid,
           roll: raw === "arbetsledare" || raw === "arbetare" ? raw : null,
           arbetareId: typeof data?.worker_id === "string" ? data.worker_id : null,
+          namn: w?.name ?? null,
+          bild: w?.profile_picture_url ?? null,
+          kontostatus: typeof data?.status === "string" ? data.status : null,
         });
       });
 
@@ -147,6 +182,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const aktuella = kontouppgifter?.uid === uid ? kontouppgifter : null;
   const roll = aktuella?.roll ?? null;
   const arbetareId = aktuella?.arbetareId ?? null;
+  const namn = aktuella?.namn ?? null;
+  const bild = aktuella?.bild ?? null;
+  const kontostatus = aktuella?.kontostatus ?? null;
+  // Adressen kommer ur sessionen och inte ur kontoraden: den ar sann sa fort
+  // man ar inloggad, alltsa utan att vanta pa fragan ovan.
+  const epost = session?.user.email ?? null;
   // Utloggad ar inte "laddar": da finns det inget att vanta pa.
   const rollLoading = uid !== undefined && aktuella === null;
 
@@ -164,7 +205,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, loading, roll, arbetareId, rollLoading, signIn, signOut }}
+      value={{
+        session,
+        loading,
+        roll,
+        arbetareId,
+        namn,
+        bild,
+        epost,
+        kontostatus,
+        rollLoading,
+        signIn,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>
