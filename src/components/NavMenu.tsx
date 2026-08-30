@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronRight } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
+import { farLeda } from "@/lib/roller";
 
 /**
  * Menyn ar avsiktligt kortare an appen.
@@ -25,15 +26,19 @@ import { useAuth } from "@/lib/auth";
  * de har lankarna. Det som faktiskt haller ar RLS och
  * kit.shifts_guard_leader_columns(). Se kommentaren i src/lib/auth.tsx.
  */
-const NAV: { href: string; label: string; bara?: "arbetsledare" | "arbetare" }[] = [
+const NAV: { href: string; label: string; bara?: "leder" | "arbetare" }[] = [
   { href: "/", label: "Hem" },
   // Arbetarens enda handling i appen, och darfor hogt upp: den som ska stampla
   // in star oftast i en port med telefonen i ena handen.
   { href: "/stampla", label: "Stampla", bara: "arbetare" },
   // Arbetsledarens tva. Lagga ut pass, och bekrafta dem nar de ar gjorda —
   // ingenting annat ar hens arbete i appen an sa lange.
-  { href: "/skapa-pass", label: "Skapa Pass", bara: "arbetsledare" },
-  { href: "/bekrafta", label: "Bekrafta Pass", bara: "arbetsledare" },
+  { href: "/skapa-pass", label: "Skapa Pass", bara: "leder" },
+  // Snabbpasset: arbete som redan ar utfort, loggat i en enda skrivning.
+  // Skarmen har funnits hela tiden men bara natts fran Kalendern och
+  // Arbetsdagboken -- alltsa aldrig av den som bara ville lagga ett pass.
+  { href: "/logga-timmar", label: "Snabb Pass", bara: "leder" },
+  { href: "/bekrafta", label: "Bekrafta Pass", bara: "leder" },
 ];
 
 /** Vilken av de tre man star pa. Exakt matchning for Hem, prefix for de andra,
@@ -55,8 +60,15 @@ export function NavMenu() {
   // Null-rollen behandlas som arbetare: en inloggning utan rad i accounts ska
   // se mindre, inte mer. Samma hallning som kit.ar_arbetsledare(), som faller
   // stangt pa ett konto den inte hittar.
-  const synligaNav = NAV.filter(
-    (item) => item.bara === undefined || item.bara === (roll ?? "arbetare")
+  // `bara: "leder"` och inte `bara: "arbetsledare"`: med tre roller ar fragan
+  // inte langre vilken roll man HAR utan vad den far gora, och en jamforelse mot
+  // strangen "arbetsledare" hade last ute adminen ur ledarens egna skarmar.
+  const synligaNav = NAV.filter((item) =>
+    item.bara === undefined
+      ? true
+      : item.bara === "leder"
+        ? farLeda(roll)
+        : !farLeda(roll)
   );
 
   useEffect(() => {

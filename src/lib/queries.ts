@@ -454,7 +454,13 @@ export async function getWorkerList(): Promise<WorkerListItem[]> {
  *   left out — an Arbetsdagbok is a work log the client signs, not a quote.
  */
 export async function getArbetsdagbokData(
-  projectId: string
+  projectId: string,
+  /**
+   * Ramen dokumentet ska tacka, som 'YYYY-MM-DD'. Utelamnas den tas ALLT
+   * arbete pa projectet med, vilket ar hur skarmen betedde sig innan ramen
+   * fanns — och fortfarande hur den beter sig om ingen ram valts.
+   */
+  ram?: { fran: string; till: string }
 ): Promise<ArbetsdagbokData | null> {
   const [{ data: project }, servicesResult, shiftsResult] = await Promise.all([
     supabase
@@ -468,13 +474,21 @@ export async function getArbetsdagbokData(
       .select("service_name")
       .eq("project_id", projectId)
       .order("service_name", { ascending: true }),
-    supabase
-      .from("shifts")
-      .select("worker_id, shift_date, hours, status, start_time, end_time, workers!inner(deleted_at)")
-      .eq("project_id", projectId)
-      .is("workers.deleted_at", null)
+    (() => {
+      const q = supabase
+        .from("shifts")
+        .select(
+          "worker_id, shift_date, hours, status, start_time, end_time, workers!inner(deleted_at)"
+        )
+        .eq("project_id", projectId)
+        .is("workers.deleted_at", null);
+      // Bada anderna INKLUSIVE: ramen 1–14 ar fjorton dagar, inte tretton. Ett
+      // halvoppet spann hade tappat en dag i skarven mellan tva dokument, och
+      // just den dagen ar den som ingen upptacker.
+      const medRam = ram ? q.gte("shift_date", ram.fran).lte("shift_date", ram.till) : q;
       // Chronological: the document reads as a diary, oldest day first.
-      .order("shift_date", { ascending: true }),
+      return medRam.order("shift_date", { ascending: true });
+    })(),
   ]);
 
   if (!project) return null;
@@ -1058,7 +1072,7 @@ export async function getKonton(): Promise<KontoItem[]> {
       // Okand roll blir null, aldrig en gissning: en rad ska inte kunna se mer
       // privilegierad ut an den ar.
       roll:
-        a.role === "arbetsledare" || a.role === "arbetare"
+        a.role === "admin" || a.role === "arbetsledare" || a.role === "arbetare"
           ? (a.role as Roll)
           : null,
       kopplad,
@@ -1324,4 +1338,88 @@ export async function getArbetareHem(arbetareId: string): Promise<ArbetareHem> {
     passDennaManad: manad.length,
     monthStart,
   };
+}
+
+/**
+ * Ramen den senast utskrivna Arbetsdagboken tackte, eller null.
+ *
+ * ⚠️ SVARAR null OCKSA NAR TABELLEN INTE FINNS.
+ *
+ * public.arbetsdagbok_perioder skapas av migration 20260830090000, och den
+ * migrationen ar inte nodvandigtvis applicerad nar den har koden gar ut — det
+ * ar tva olika utrullningar och ordningen mellan dem ar inte given. En
+ * arbetsdagboksskarm som slutade fungera helt for att MINNET av forra ramen
+ * saknades vore en dalig bytesaffar: ramen gar att valja anda, man far bara
+ * ingen paminnelse om var forra slutade.
+ *
+ * Ett riktigt fel (natet nere, RLS nekar) ger ocksa null och alltsa ingen
+ * paminnelse — men aldrig ett falskt "forra slutade har", vilket ar det enda
+ * svar som hade kunnat lura nagon att hoppa over dagar.
+ */
+export async function getSenastePeriod(
+  projectId: string
+): Promise<{ fran: string; till: string } | null> {
+  const { data, error } = await supabase
+    .from("arbetsdagbok_perioder")
+    .select("fran, till")
+    .eq("project_id", projectId)
+    .order("till", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return { fran: String(data.fran), till: String(data.till) };
+}
+
+/**
+ * Skriv upp att en Arbetsdagbok tackt den har ramen.
+ *
+ * Kastar inte. Dokumentet ar redan skapat nar det har anropas, och ett fel i
+ * bokforingen av ramen far inte se ut som att utskriften misslyckades — det
+ * enda som gar forlorat ar paminnelsen till nasta gang.
+ */
+export async function sparaPeriod(
+  projectId: string,
+  fran: string,
+  till: string,
+  skapadAv: string | null
+): Promise<void> {
+  await supabase
+    .from("arbetsdagbok_perioder")
+    .insert({ project_id: projectId, fran, till, skapad_av: skapadAv });
+}
+
+/**
+ * Forsta och sista dagen det finns arbete pa ett project, eller null nar det
+ * inte finns nagot alls.
+ *
+ * Till ramens utgangslage. Utan den skulle en Arbetsdagbok som skrivs ut for
+ * forsta gangen behova gissa ett startdatum -- och en gissning som ligger for
+ * sent tappar tyst bort de aldsta dagarna, vilket ar samma fel som glappet
+ * mellan tva ramar, bara i borjan i stallet for i mitten.
+ */
+export async function getProjectDagSpann(
+  projectId: string
+): Promise<{ forsta: string; sista: string } | null> {
+  const [forstaRes, sistaRes] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select("shift_date")
+      .eq("project_id", projectId)
+      .order("shift_date", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("shifts")
+      .select("shift_date")
+      .eq("project_id", projectId)
+      .order("shift_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const forsta = forstaRes.data?.shift_date;
+  const sista = sistaRes.data?.shift_date;
+  if (!forsta || !sista) return null;
+  return { forsta: String(forsta), sista: String(sista) };
 }

@@ -3,6 +3,7 @@
 import { User } from "@/components/Icons";
 import { EmptyState } from "@/components/Screen";
 import { KONTO_STATUS } from "@/lib/konton";
+import { ROLLER, ROLL_ETIKETT, farLeda } from "@/lib/roller";
 import type { KontoItem, Roll } from "@/lib/types";
 
 /**
@@ -71,11 +72,11 @@ export function KontoList({
   );
 }
 
-/** De tva rollerna, i den ordning de star i vaxeln. */
-const ROLLER: { value: Roll; label: string }[] = [
-  { value: "arbetsledare", label: "Arbetsledare" },
-  { value: "arbetare", label: "Arbetare" },
-];
+/** De tre rollerna, i den ordning de star i vaxeln: mest behorig forst. */
+const VAXEL: { value: Roll; label: string }[] = ROLLER.map((r) => ({
+  value: r,
+  label: ROLL_ETIKETT[r],
+}));
 
 /**
  * Rollvaxeln: EN kontroll med tva lagen, inte tva knappar bredvid varandra.
@@ -109,7 +110,9 @@ function RollVaxel({
 }) {
   // Okand roll behandlas som arbetare, samma hallning som overallt annars.
   const gallande: Roll = konto.roll ?? "arbetare";
-  const arLedare = gallande === "arbetsledare";
+  // Vilket av de tre segmenten plattan star pa. Positionen, inte rollen, ar det
+  // vaxeln ritar — se plattan nedan.
+  const plats = Math.max(0, VAXEL.findIndex((r) => r.value === gallande));
 
   /**
    * Att degradera SIG SJALV ar sparrat.
@@ -124,7 +127,7 @@ function RollVaxel({
    * missbruk. Den som verkligen vill kliva av ber en kollega gora det, vilket
    * ocksa ar den enda vagen som lamnar nagon kvar som kan angra sig.
    */
-  const kanIntaDegraderaSigSjalv = egetKonto && arLedare;
+  const kanIntaDegraderaSigSjalv = egetKonto && farLeda(gallande);
 
   return (
     <form action={onRollByte} className="mt-2.5">
@@ -133,23 +136,31 @@ function RollVaxel({
       <div
         role="group"
         aria-label={`Roll for ${konto.namn}`}
-        className="relative grid grid-cols-2 rounded-xl bg-white/8 p-1"
+        className="relative grid grid-cols-3 rounded-xl bg-white/8 p-1"
       >
         {/* Plattan. `w-[calc(50%-4px)]` ar exakt en halva av innermatten
             (p-1 = 4px pa varje sida), sa `translate-x-full` flyttar den precis
-            en halva — fran vanster segments kant till hogers. Ingen gissad
-            pixel, och den foljer med nar raden byter bredd. */}
+            en tredjedel. `(100%-8px)/3` ar exakt ett segment av innermatten
+            (p-1 = 4px pa varje sida), sa `translate-x-full` flyttar plattan
+            precis ett segment och `200%` tva. Ingen gissad pixel, och den
+            foljer med nar raden byter bredd. */}
         <span
           aria-hidden
-          className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-lg bg-night-accent shadow-[0_2px_10px_-2px_rgba(255,185,46,0.6)] transition-transform duration-300 ease-out motion-reduce:transition-none ${
-            arLedare ? "translate-x-0" : "translate-x-full"
+          className={`absolute inset-y-1 left-1 w-[calc((100%-8px)/3)] rounded-lg bg-night-accent shadow-[0_2px_10px_-2px_rgba(255,185,46,0.6)] transition-transform duration-300 ease-out motion-reduce:transition-none ${
+            plats === 0
+              ? "translate-x-0"
+              : plats === 1
+                ? "translate-x-full"
+                : "translate-x-[200%]"
           }`}
         />
 
-        {ROLLER.map((roll) => {
+        {VAXEL.map((roll) => {
           const vald = roll.value === gallande;
-          // Egen degradering: halvan "Arbetare" ar stangd pa sin egen rad.
-          const sparrad = kanIntaDegraderaSigSjalv && roll.value === "arbetare";
+          /* Egen degradering: pa sin egen rad ar varje roll som INTE far leda
+             stangd. En admin far daremot gora sig sjalv till arbetsledare —
+             det ar fortfarande en ledande roll, sa vagen tillbaka star oppen. */
+          const sparrad = kanIntaDegraderaSigSjalv && !farLeda(roll.value);
           return (
             <button
               key={roll.value}
@@ -160,7 +171,7 @@ function RollVaxel({
               aria-pressed={vald}
               title={
                 sparrad
-                  ? "Du kan inte ta bort din egen arbetsledarroll — be en kollega gora det."
+                  ? "Du kan inte ta bort din egen ledarroll — be en kollega gora det."
                   : undefined
               }
               /* z-10: texten ligger OVANFOR plattan, sa den valda etiketten

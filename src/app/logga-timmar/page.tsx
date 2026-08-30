@@ -11,7 +11,22 @@ import { useQuery } from "@/lib/useQuery";
 import { LoggaTimmarForm } from "./LoggaTimmarForm";
 
 /**
- * Logga Timmar.
+ * Snabb Pass.
+ *
+ * Skarmen hette Logga Timmar och gor exakt samma sak som forut -- namnet ar det
+ * enda som andrats. Skalet ar att den numera har en granne som ocksa lagger ut
+ * pass, och de tva ar lattast att halla isar pa vad de KOSTAR i uppmarksamhet:
+ *
+ *   Skapa Pass   En BESTALLNING. Passet fods 'open' utan timmar, arbetaren
+ *                stamplar in pa det, och arbetsledaren bekraftar det efterat.
+ *                Tre steg, tre tillfallen att andra sig.
+ *   Snabb Pass   Ett FAKTUM. Arbetet ar redan utfort; raden fods 'confirmed'
+ *                med timmarna ifyllda och nar aldrig bekraftelsekon.
+ *
+ * Ett snabbpass ror darfor varken forval, priolista eller tillsattning. Det ar
+ * med flit: den som lagger ett snabbpass har redan bestamt vem som gick det, och
+ * ett system som da borjade rangordna kandidater vore i vagen. Passet syns anda
+ * hos arbetaren och pa Arbetsdagboken som vilket pass som helst.
  *
  * `?project=` valjer vilket project passet hor till, och den parametern kommer
  * fran adressfaltet snarare an fran filen — darav <Suspense>-gransen. Se
@@ -25,8 +40,8 @@ export default function LoggaTimmarPage() {
   return (
     <Screen
       tone="amber"
-      eyebrow="Tidrapport"
-      title="Logga Timmar"
+      eyebrow="Redan utfort"
+      title="Snabb Pass"
       back={{ href: "/", label: "Hem" }}
     >
       <Suspense fallback={<PanelSkeleton />}>

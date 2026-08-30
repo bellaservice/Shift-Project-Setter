@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Arbetsdagbok } from "@/components/Arbetsdagbok";
-import { ButtonLink } from "@/components/Button";
+import { Button, ButtonLink } from "@/components/Button";
 import { Warning } from "@/components/Icons";
 import { PanelSkeleton, Query } from "@/components/Query";
 import { EmptyState, Screen } from "@/components/Screen";
@@ -13,7 +13,16 @@ import {
   type SurveyQuestion,
 } from "@/components/ArbetsdagbokSurvey";
 import { DownloadPdfButton } from "@/components/DownloadPdfButton";
-import { getArbetsdagbokData, getPassProblems } from "@/lib/queries";
+import { PeriodVal } from "@/components/PeriodVal";
+import {
+  getArbetsdagbokData,
+  getPassProblems,
+  getProjectDagSpann,
+  getSenastePeriod,
+  sparaPeriod,
+} from "@/lib/queries";
+import { addDays, stockholmToday } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
 import type { ArbetsdagbokData } from "@/lib/types";
 import { useQuery } from "@/lib/useQuery";
 
@@ -110,14 +119,59 @@ function ArbetsdagbokScreen() {
   // have, or a pass whose span really is longer than its paid hours.
   const fortsatt = params.get("fortsatt");
 
-  const bundle = useQuery(async () => {
+  const { session } = useAuth();
+
+  /**
+   * Ramen dokumentet ska tacka. Null tills utgangslaget rakats fram nedan --
+   * dokumentet hamtas inte forran det ar gjort, eftersom en forsta hamtning
+   * utan ram hade dragit hem hela projectets historik bara for att kastas.
+   */
+  const [ram, setRam] = useState<{ fran: string; till: string } | null>(null);
+  /* Har utskriftsdialogen varit uppe? Sager inte att nagot sparades -- se
+     ramkvittensen langre ned. */
+  const [dialogenVarUppe, setDialogenVarUppe] = useState(false);
+  const [ramSparad, setRamSparad] = useState(false);
+
+  /* Vad forra dokumentet tackte, och vilka dagar projectet overhuvudtaget har.
+     Bada behovs for att kunna foresla en ram, sa de hamtas tillsammans. */
+  const utgangslage = useQuery(async () => {
     if (!id) return null;
+    const [senaste, spann] = await Promise.all([
+      getSenastePeriod(id),
+      getProjectDagSpann(id),
+    ]);
+    return { senaste, spann };
+  }, [id]);
+
+  /**
+   * Forslaget, en gang: dar forra dokumentet slutade fram till sista arbetade
+   * dagen.
+   *
+   * Dagen EFTER forra ramens slut, inte samma dag: ett dokument som borjar dar
+   * det forra slutade skulle ta med den dagen tva ganger, och en dubbelfakturerad
+   * dag ar ett varre fel an en utelamnad -- den forsta upptacks av kunden.
+   *
+   * Har projectet aldrig skrivits ut borjar ramen pa dess forsta arbetade dag,
+   * sa att ingenting ligger fore ramen fran allra forsta borjan.
+   */
+  useEffect(() => {
+    if (ram !== null || utgangslage.data == null) return;
+    const { senaste, spann } = utgangslage.data;
+    const idag = stockholmToday();
+    setRam({
+      fran: senaste ? addDays(senaste.till, 1) : (spann?.forsta ?? idag),
+      till: spann?.sista ?? idag,
+    });
+  }, [ram, utgangslage.data]);
+
+  const bundle = useQuery(async () => {
+    if (!id || ram === null) return null;
     const [data, passProblems] = await Promise.all([
-      getArbetsdagbokData(id),
+      getArbetsdagbokData(id, ram),
       getPassProblems(id),
     ]);
     return data === null ? null : { data, passProblems };
-  }, [id]);
+  }, [id, ram?.fran, ram?.till]);
 
   // Obekraftade pass ar en HARD sparr, inte en fraga. Spec avsnitt 7 gor
   // dokumentet omojligt att skapa forran arbetsledaren bekraftat allt i
@@ -232,7 +286,7 @@ function ArbetsdagbokScreen() {
                   href={`/logga-timmar?project=${id}`}
                   className="font-bold text-night-accent underline underline-offset-2"
                 >
-                  Logga timmar på projectet
+                  Lägg ett snabbpass på projectet
                 </Link>{" "}
                 först om dokumentet ska innehålla rader.
               </p>
@@ -240,7 +294,65 @@ function ArbetsdagbokScreen() {
           </div>
         )}
 
-        <DownloadPdfButton />
+        {/* Ramen star OVER knappen: vilka dagar som kommer med avgors innan
+            dokumentet skrivs ut, inte efterat. */}
+        {ram && (
+          <PeriodVal
+            fran={ram.fran}
+            till={ram.till}
+            onFran={(fran) => setRam({ fran, till: ram.till })}
+            onTill={(till) => setRam({ fran: ram.fran, till })}
+            senaste={utgangslage.data?.senaste ?? null}
+          />
+        )}
+
+        {/* Ramen skrivs upp nar dokumentet faktiskt skapas, inte nar den valjs:
+            en ram man provade sig fram till och andrade sig om ar ingen
+            utskrift, och skulle annars lura nasta utskrift att hoppa over dagar
+            som aldrig kom med nagonstans. */}
+        <DownloadPdfButton onPrinted={() => setDialogenVarUppe(true)} />
+
+        {/* Ramkvittensen.
+
+            Den fragar i stallet for att gissa, och det ar avsiktligt.
+            Webblasaren skiljer inte pa "sparade PDF:en" och "avbrot dialogen",
+            sa en ram som bokfordes automatiskt hade kunnat markera dagar som
+            utskrivna fast dokumentet aldrig blev till. Nasta utskrift hade da
+            borjat efter dem, och de dagarna hade aldrig kommit med nagonstans
+            -- exakt det fel hela ramminnet finns for att forhindra.
+
+            Ett extra tryck ar ett lagt pris for att raden alltid ar sann. */}
+        {dialogenVarUppe && ram && (
+          <div className="rounded-2xl border border-night-accent/40 bg-night-accent/10 p-4">
+            {ramSparad ? (
+              <p className="text-sm font-bold text-night-accent">
+                Ramen ar noterad. Nasta dokument foreslas borja dagen efter.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-white">
+                  Blev dokumentet sparat?
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-white/70">
+                  Da skriver vi upp ramen, sa nasta Arbetsdagbok foreslas borja
+                  dagen efter. Avbrot du utskriften ska du lamna den har.
+                </p>
+                <Button
+                  type="button"
+                  size="md"
+                  className="mt-3 w-full"
+                  onClick={async () => {
+                    if (!id) return;
+                    await sparaPeriod(id, ram.fran, ram.till, session?.user.id ?? null);
+                    setRamSparad(true);
+                  }}
+                >
+                  Ja, notera ramen
+                </Button>
+              </>
+            )}
+          </div>
+        )}
         <p className="px-1 text-xs leading-relaxed text-white/55">
           Välj <strong className="font-bold">Spara som PDF</strong> som
           destination i dialogen. Förhandsvisningen nedan är arken som hamnar i

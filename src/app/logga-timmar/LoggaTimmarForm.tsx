@@ -77,7 +77,7 @@ export function LoggaTimmarForm({
       <FormError message={error} />
 
       <Button type="submit" disabled={pending} className="mt-1 w-full">
-        {pending ? "Sparar…" : "Logga Timmar"}
+        {pending ? "Sparar…" : "Skapa Snabb Pass"}
       </Button>
     </form>
   );

@@ -3,6 +3,7 @@
 import { User } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
 import { KONTO_STATUS } from "@/lib/konton";
+import { rollEtikett } from "@/lib/roller";
 
 /**
  * Ditt eget konto, overst pa Konto-skarmen.
@@ -54,13 +55,7 @@ export function MittKonto() {
           {/* Rollen i amber: den ar det som avgor vad resten av appen visar,
               och darfor den enda uppgiften pa kortet som ar vard en fargton. */}
           <span className="rounded-full bg-night-accent/15 px-2.5 py-1 text-[11px] font-bold text-night-accent">
-            {rollLoading
-              ? "…"
-              : roll === "arbetsledare"
-                ? "Arbetsledare"
-                : roll === "arbetare"
-                  ? "Arbetare"
-                  : "Ingen roll"}
+            {rollLoading ? "…" : rollEtikett(roll)}
           </span>
           {status && (
             <span

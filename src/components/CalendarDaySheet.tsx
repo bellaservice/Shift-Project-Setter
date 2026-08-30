@@ -222,7 +222,7 @@ export function CalendarDaySheet({
         <div className="flex flex-col gap-2">
           <ButtonLink href={loggaTimmarHref(date)} className="w-full">
             <Plus className="h-5 w-5" />
-            Logga Timmar
+            Snabb Pass
           </ButtonLink>
           <ButtonLink
             href={`/kalender/arende?datum=${date}`}

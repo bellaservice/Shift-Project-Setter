@@ -19,7 +19,7 @@ import type { Roll } from "@/lib/types";
  * oversattningen av databasens svar till svenska.
  */
 
-const ROLLER: Roll[] = ["arbetsledare", "arbetare"];
+const ROLLER: Roll[] = ["admin", "arbetsledare", "arbetare"];
 
 function kontoId(value: FormDataEntryValue | null): string {
   const raw = String(value ?? "").trim();

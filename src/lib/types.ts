@@ -219,7 +219,7 @@ export type TrashItem = {
 export type KontoStatus = "aktiv" | "pausad" | "avstangd";
 
 /** Approllen, som `accounts_role_check` stavar den. Speglar `Roll` i lib/auth. */
-export type Roll = "arbetsledare" | "arbetare";
+export type Roll = "admin" | "arbetsledare" | "arbetare";
 
 /**
  * En rad i kontolistan: inloggningen och personen den ar, i ett.

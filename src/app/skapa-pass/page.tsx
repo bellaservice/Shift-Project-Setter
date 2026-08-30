@@ -10,6 +10,7 @@ import { getProjects, getWorkers } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/useQuery";
 import { SkapaPassForm } from "./SkapaPassForm";
+import { farLeda } from "@/lib/roller";
 
 /**
  * Skapa Pass — arbetsledaren lagger ut pass i forvag (spec Fas 1, minimal).
@@ -51,7 +52,7 @@ function SkapaPassContent() {
   // Samma hallning som /bekrafta: lanken ar borta ur arbetarens meny, men
   // adressen gar att skriva. Databasen avvisar en INSERT fran en arbetare
   // (shifts_insert_arbetsledare), sa det har ar artighet och inte sparren.
-  if (!rollLoading && roll !== "arbetsledare") {
+  if (!rollLoading && !farLeda(roll)) {
     return (
       <Screen tone="amber" eyebrow="Schemalaggning" title="Skapa Pass" back={{ href: "/", label: "Hem" }}>
         <EmptyState

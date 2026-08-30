@@ -26,7 +26,7 @@ import { getSupabase } from "@/lib/supabase/browser";
  */
 
 /** Approllen, som `accounts_role_check` stavar den. */
-export type Roll = "arbetsledare" | "arbetare";
+export type Roll = "admin" | "arbetsledare" | "arbetare";
 
 type AuthState = {
   session: Session | null;
@@ -163,7 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           | undefined;
         setKontouppgifter({
           uid,
-          roll: raw === "arbetsledare" || raw === "arbetare" ? raw : null,
+          roll:
+            raw === "admin" || raw === "arbetsledare" || raw === "arbetare"
+              ? raw
+              : null,
           arbetareId: typeof data?.worker_id === "string" ? data.worker_id : null,
           namn: w?.name ?? null,
           bild: w?.profile_picture_url ?? null,

@@ -25,12 +25,30 @@ import { Download } from "@/components/Icons";
  * dialog and the page is already rendered — the second or two of "Skapar PDF…"
  * was a browser booting on the server, and there is no browser to boot.
  */
-export function DownloadPdfButton({ disabled }: { disabled?: boolean }) {
+export function DownloadPdfButton({
+  disabled,
+  onPrinted,
+}: {
+  disabled?: boolean;
+  /**
+   * Kors nar utskriftsdialogen stangts -- ALLTSA AVEN NAR DEN AVBROTS.
+   *
+   * Webblasaren berattar inte om en PDF faktiskt sparades; `afterprint` fyrar
+   * likadant om man tryckte Spara som om man tryckte Avbryt. Den som lyssnar
+   * har far darfor inte behandla det som "dokumentet ar skapat" utan bara som
+   * "dialogen har varit uppe" -- se arbetsdagbokens ramkvittens, som fragar
+   * anvandaren i stallet for att gissa.
+   */
+  onPrinted?: () => void;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <Button
         type="button"
-        onClick={() => window.print()}
+        onClick={() => {
+          window.print();
+          onPrinted?.();
+        }}
         disabled={disabled}
         className="w-full"
       >

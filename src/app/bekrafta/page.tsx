@@ -12,6 +12,7 @@ import { getShiftsAwaitingConfirmation } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/useQuery";
 import { confirmShift, markNoShow } from "./actions";
+import { farLeda } from "@/lib/roller";
 
 /**
  * Bekraftelsekon -- arbetsledarens close-out (spec Fas 4 och avsnitt 6).
@@ -69,7 +70,7 @@ export default function BekraftaPage() {
   //
   // Null-rollen raknas som arbetare: faller man ur kontotabellen ska man se
   // mindre, inte mer.
-  if (!rollLoading && roll !== "arbetsledare") {
+  if (!rollLoading && !farLeda(roll)) {
     return (
       <Screen
         tone="amber"

@@ -7,6 +7,7 @@ import { ArbetareHem } from "@/components/ArbetareHem";
 import { getArbetareHem } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/useQuery";
+import { farLeda } from "@/lib/roller";
 
 /**
  * Hem.
@@ -32,7 +33,7 @@ export default function Home() {
   const { roll, arbetareId, rollLoading } = useAuth();
   // Okand roll raknas som arbetare: den som fallit ur kontotabellen ska se
   // mindre, inte mer. Samma hallning som kit.ar_arbetsledare() i databasen.
-  const arArbetare = !rollLoading && roll !== "arbetsledare";
+  const arArbetare = !rollLoading && !farLeda(roll);
 
   // Bara arbetaren har nagot att hamta. Arbetsledarens Hem ar tva lankar och
   // stallor darfor ingen fraga alls — foretagets totaler hamtades forr aven nar

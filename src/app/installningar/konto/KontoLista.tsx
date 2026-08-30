@@ -10,6 +10,7 @@ import { getKonton } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/useQuery";
 import { satsRoll } from "./actions";
+import { farLeda } from "@/lib/roller";
 
 /**
  * Hamtningen, bruten ut ur sidan.
@@ -53,7 +54,7 @@ export function KontoLista() {
   // befogenheter. Bada hor till arbetsledaren. Grinden ar artighet -- RLS
   // avvisar en arbetares skrivning oavsett -- men en skarm full av knappar som
   // alltid misslyckas ar inte ett vanligt bemotande.
-  if (!rollLoading && roll !== "arbetsledare") {
+  if (!rollLoading && !farLeda(roll)) {
     return (
       <EmptyState
         title="Den har skarmen ar arbetsledarens."
