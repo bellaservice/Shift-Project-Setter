@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { User } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
+import { rollEtikett } from "@/lib/roller";
 
 /**
  * Vad kugghjulet innehaller: det som handlar om appen och foretaget snarare an
@@ -27,6 +28,20 @@ export function SettingsMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { roll, rollLoading, namn, bild, epost, session, signOut } = useAuth();
+
+  /**
+   * Pa Konto-skarmen ar knappen ett kugghjul igen.
+   *
+   * Kortet overst pa den sidan visar redan ditt ansikte i 64px. Samma bild en
+   * gang till i hornet, 20 pixlar darifran, sager ingenting nytt — den bara
+   * upprepar sig, och tva likadana bilder pa samma skarm ser ut som ett fel
+   * snarare an som en avsikt.
+   *
+   * Kugghjulet ar dessutom ratt symbol just dar: Konto ar en av skarmarna INUTI
+   * menyn, sa knappen pekar tillbaka pa rummet man redan star i. Overallt annars
+   * ar frågan "vem ar inloggad", och da ar ansiktet svaret.
+   */
+  const visaKugghjul = pathname.startsWith("/installningar/konto");
 
   useEffect(() => {
     if (!open) return;
@@ -57,7 +72,13 @@ export function SettingsMenu() {
           lugnare. */}
       <button
         type="button"
-        aria-label={namn ? `${namn} — konto och inställningar` : "Konto och inställningar"}
+        aria-label={
+          visaKugghjul
+            ? "Inställningar"
+            : namn
+              ? `${namn} — konto och inställningar`
+              : "Konto och inställningar"
+        }
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((wasOpen) => !wasOpen)}
@@ -65,7 +86,9 @@ export function SettingsMenu() {
           open ? "ring-2 ring-night-accent" : ""
         }`}
       >
-        {bild ? (
+        {visaKugghjul ? (
+          <Kugghjul open={open} />
+        ) : bild ? (
           /* Ingen next/image, av samma skal som Avatar i KontoList: kallan ar
              profilbilden i Supabase Storage, den ar redan liten, och den visas
              i 44px. */
@@ -123,13 +146,7 @@ export function SettingsMenu() {
             <p className="truncate text-xs text-white/55">{epost}</p>
           )}
           <p className="mt-1 text-sm font-bold text-night-accent">
-            {rollLoading
-              ? "…"
-              : roll === "arbetsledare"
-                ? "Arbetsledare"
-                : roll === "arbetare"
-                  ? "Arbetare"
-                  : "Ingen roll"}
+            {rollLoading ? "…" : rollEtikett(roll)}
           </p>
         </div>
 
@@ -188,5 +205,31 @@ export function SettingsMenu() {
         </div>
       </nav>
     </div>
+  );
+}
+
+/**
+ * Kugghjulet, som det sag ut innan ansiktet tog over knappen.
+ *
+ * Det roterar nar panelen oppnas — det gjorde det forut, och till skillnad fran
+ * ett ansikte ar ett kugghjul en sak som TAL att snurra.
+ */
+function Kugghjul({ open }: { open: boolean }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`h-5 w-5 text-white transition-transform duration-300 ease-out motion-reduce:transition-none ${
+        open ? "rotate-90" : ""
+      }`}
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
   );
 }
