@@ -181,10 +181,31 @@ export function NyttKontoForm({ kandidater }: { kandidater: KontoKandidat[] }) {
               ariaLabel="Arbetare kontot gäller"
               emptyMessage="Alla arbetare har redan konto."
             />
-            <FieldHint>
-              Bara arbetare utan konto visas. En arbetare kan ha högst en
-              inloggning.
-            </FieldHint>
+            {/* Hindret star DAR det gar att atgarda.
+
+                Det stod redan langst ned, under den lasta knappen -- alltsa en
+                skarmhojd bort fran den tomma rutan det handlar om, i samma
+                dampade grafton som varje annan hjalprad. Man kunde fylla i
+                adress och losenord, mota en knapp som inte gick att trycka pa,
+                och inte hitta orsaken: den lag ovanfor, i ett falt man redan
+                scrollat forbi.
+
+                Andra meningen namner utvagen med flit. Att valja rollen Admin
+                och anda bli ombedd att peka ut en arbetare ar forvirrande om man
+                inte vet att de tva fragorna ar skilda -- och den som ska ha ett
+                kontorskonto vill at "Ej arbetare", inte at listan. */}
+            {workerId === "" ? (
+              <FieldHint tone="warn">
+                Välj vilken arbetare kontot gäller — eller byt till{" "}
+                <strong className="font-bold">Ej arbetare</strong> ovan om
+                kontot inte hör till någon som loggar pass.
+              </FieldHint>
+            ) : (
+              <FieldHint>
+                Bara arbetare utan konto visas. En arbetare kan ha högst en
+                inloggning.
+              </FieldHint>
+            )}
           </div>
         ) : (
           <FieldHint>
@@ -293,8 +314,10 @@ export function NyttKontoForm({ kandidater }: { kandidater: KontoKandidat[] }) {
             {grindOppen ? "Inloggning kopierad" : "Kopiera Inloggning"}
           </Button>
 
+          {/* warn och inte muted: raden sager varfor knappen ovanfor inte gar
+              att trycka pa, och det ar inte en upplysning i forbigaende. */}
           {!kanKopiera && felIFalt && (
-            <FieldHint>{felIFalt}</FieldHint>
+            <FieldHint tone="warn">{felIFalt}</FieldHint>
           )}
 
           {/* Urklipp nekade. Raderna star i klartext i stallet, sa att de gar
