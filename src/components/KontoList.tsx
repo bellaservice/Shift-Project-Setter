@@ -32,7 +32,20 @@ export function KontoList({
   pending = false,
 }: {
   konton: KontoItem[];
-  /** Den inloggades eget konto-id, sa raden kan sparra egen degradering. */
+  /**
+   * Den inloggades eget konto-id. Raden LYFTS UT ur listan.
+   *
+   * Ditt eget konto star redan overst pa skarmen, i <MittKonto>, med bild, namn,
+   * roll och status. En andra rad om samma konto langre ned ar inte mer
+   * information -- den ar samma information en gang till, mitt i en lista som
+   * annars svarar pa en annan fraga: vilka ANDRA kommer in i appen.
+   *
+   * ⚠️ Foljden ar att man inte langre kan andra sin EGEN roll harifran. Det ar
+   * mest en formalisering av hur det redan var: vaxeln slappte anda inte igenom
+   * en degradering av sig sjalv, eftersom man i samma stund tappar ratten att ta
+   * tillbaka rollen. Det som forsvinner ar mojligheten att BEFORDRA sig sjalv --
+   * en arbetsledare kan inte langre gora sig till admin utan att be en kollega.
+   */
   egetKontoId?: string | null;
   /**
    * Utelamnas den ar listan bara att lasa — precis som forr. Skickas den med
@@ -46,11 +59,23 @@ export function KontoList({
   onRollByte?: (formData: FormData) => void;
   pending?: boolean;
 }) {
-  if (konton.length === 0) {
+  // Listan ar de ANDRAS konton. Se egetKontoId ovan for varfor den egna raden
+  // inte star har.
+  const andras = konton.filter((konto) => konto.id !== egetKontoId);
+
+  if (andras.length === 0) {
     return (
       <EmptyState
-        title="Inga konton än."
-        hint="Ett konto är en arbetares inloggning i appen."
+        title={
+          konton.length === 0
+            ? "Inga konton än."
+            : "Du är ensam med ett konto."
+        }
+        hint={
+          konton.length === 0
+            ? "Ett konto är en arbetares inloggning i appen."
+            : "Ditt eget konto står överst på skärmen. Tillverka Konto lägger till fler."
+        }
       />
     );
   }
@@ -58,10 +83,14 @@ export function KontoList({
   return (
     <div className="glass rounded-2xl">
       <div className="divide-y divide-night-line">
-        {konton.map((konto) => (
+        {andras.map((konto) => (
           <KontoRad
             key={konto.id}
             konto={konto}
+            /* Alltid falskt efter filtreringen ovan. Jamforelsen star kvar som
+               ett balte: skulle filtret nagon gang tas bort ar raden fortfarande
+               ratt markt, i stallet for att tyst erbjuda en vaxel som RLS anda
+               avvisar. */
             egetKonto={konto.id === egetKontoId}
             onRollByte={onRollByte}
             pending={pending}
