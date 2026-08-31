@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/browser";
+import type { Roll } from "@/lib/types";
 
 /**
  * Ber Edge-funktionen tillverka en inloggning.
@@ -19,6 +20,8 @@ export async function tillverkaKonto(input: {
   workerId: string | null;
   email: string;
   password: string;
+  /** Rollen kontot ska fodas med. */
+  roll: Roll;
 }): Promise<{ id: string; email: string }> {
   const { data, error } = await supabase.functions.invoke("tillverka-konto", {
     body: input,
@@ -54,5 +57,39 @@ export async function tillverkaKonto(input: {
   }
 
   if (!data?.id) throw new Error("Kontot skapades men svaret gick inte att lasa.");
+
+  /**
+   * Rollen sätts en gång till, härifrån.
+   *
+   * Funktionen ovan tar emot `roll` — men den version som är driftsatt gör det
+   * inte nödvändigtvis, och en Edge-funktion kan bara driftsättas med Supabase
+   * CLI. Skulle den gamla versionen svara får kontot kolumnens standardvärde
+   * 'arbetare', och en nyskapad admin vore tyst degraderad utan att någonting
+   * såg fel ut.
+   *
+   * Skrivningen går genom PostgREST med den inloggades egen token, alltså samma
+   * väg som rollväxeln i kontolistan, och avvisas av accounts_update_arbetsledare
+   * om den som skapar inte får dela ut roller. Är rollen redan rätt skriver den
+   * samma värde en gång till, vilket är gratis.
+   *
+   * Bara för de två högre rollerna: 'arbetare' är kolumnens standard och behöver
+   * ingen andra skrivning.
+   */
+  if (input.roll !== "arbetare") {
+    const { error: rollFel } = await supabase
+      .from("accounts")
+      .update({ role: input.roll })
+      .eq("id", data.id);
+
+    if (rollFel) {
+      // Kontot FINNS. Det måste stå i felet — annars försöker användaren igen
+      // och möts av "det finns redan en inloggning på den adressen".
+      throw new Error(
+        `Kontot skapades, men rollen kunde inte sättas till ${input.roll}: ` +
+          `${rollFel.message}. Kontot finns och är arbetare — ändra rollen i listan.`
+      );
+    }
+  }
+
   return data as { id: string; email: string };
 }

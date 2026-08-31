@@ -8,8 +8,9 @@ import { FieldHint, FieldLabel, FIELD_BOX } from "@/components/Field";
 import { FormSection } from "@/components/Panel";
 import { Check, Copy, Eye, EyeOff, Warning } from "@/components/Icons";
 import { inloggningsText, skrivTillUrklipp } from "@/lib/konton";
+import { ROLLER, ROLL_ETIKETT } from "@/lib/roller";
 import { tillverkaKonto } from "@/lib/tillverkaKonto";
-import type { KontoKandidat } from "@/lib/types";
+import type { KontoKandidat, Roll } from "@/lib/types";
 
 /**
  * Tillverka Konto.
@@ -36,6 +37,19 @@ import type { KontoKandidat } from "@/lib/types";
 export function NyttKontoForm({ kandidater }: { kandidater: KontoKandidat[] }) {
   const router = useRouter();
 
+  /**
+   * Rollen kontot fods med, oberoende av om det hor till en arbetare.
+   *
+   * De tva fragorna ar verkligen skilda. "Arbetare / Ej arbetare" sager vem
+   * kontot AR -- om det finns en person i workers bakom inloggningen, och
+   * darmed om hen gar att schemalagga och stampla in. Rollen sager vad kontot
+   * FAR GORA. En arbetsledare som ocksa gar pass ar bada; en admin pa kontoret
+   * ar det ena utan det andra.
+   *
+   * Standard 'arbetare': det vanligaste kontot, och den minst behoriga rollen.
+   * Ett falt man glommer att rora ska inte dela ut befogenheter.
+   */
+  const [roll, setRoll] = useState<Roll>("arbetare");
   const [tillArbetare, setTillArbetare] = useState(true);
   const [workerId, setWorkerId] = useState("");
   const [epost, setEpost] = useState("");
@@ -116,6 +130,7 @@ export function NyttKontoForm({ kandidater }: { kandidater: KontoKandidat[] }) {
         workerId: tillArbetare ? workerId : null,
         email: trimmadEpost,
         password: losen,
+        roll,
       });
       router.push("/installningar/konto");
     } catch (cause) {
@@ -177,6 +192,30 @@ export function NyttKontoForm({ kandidater }: { kandidater: KontoKandidat[] }) {
             loggar pass. Det syns i listan under sin e-postadress.
           </FieldHint>
         )}
+      </FormSection>
+
+      <FormSection title="Roll">
+        {/* Tre lagen, samma vaxel som i kontolistan -- och medvetet SKILD fran
+            valet ovan. Rollen gar att satta pa bade ett arbetarkonto och ett
+            utan arbetare: en arbetsledare som ocksa gar pass ar det forsta, en
+            admin pa kontoret det andra. */}
+        <div className="glass-flat flex gap-1 rounded-xl p-1">
+          {ROLLER.map((r) => (
+            <VaxelKnapp
+              key={r}
+              aktiv={roll === r}
+              onClick={() => setRoll(r)}
+              label={ROLL_ETIKETT[r]}
+            />
+          ))}
+        </div>
+        <FieldHint>
+          {roll === "arbetare"
+            ? "Stämplar in och ut på sina egna pass. Ser ingenting annat."
+            : roll === "arbetsledare"
+              ? "Lägger ut pass, bekräftar dem och sköter project och konton."
+              : "Allt arbetsledaren kan, plus att styra project och skriva ut Arbetsdagboken."}
+        </FieldHint>
       </FormSection>
 
       <FormSection title="Inloggning">

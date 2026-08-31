@@ -64,6 +64,8 @@ type Kropp = {
   workerId?: string | null;
   email?: string;
   password?: string;
+  /** 'admin' | 'arbetsledare' | 'arbetare'. Utelamnad blir det 'arbetare'. */
+  roll?: string;
 };
 
 Deno.serve(async (req) => {
@@ -100,6 +102,15 @@ Deno.serve(async (req) => {
   }
 
   const workerId = kropp.workerId?.trim() || null;
+
+  // Rollen kontot fods med. Utelamnas den blir det 'arbetare' -- den minst
+  // behoriga, vilket ar ratt utfall for ett anrop som inte sagt nagot: ett
+  // konto ska aldrig fa mer an det bett om genom att ett falt ramlat bort.
+  const ROLLER = ["admin", "arbetsledare", "arbetare"] as const;
+  const roll = (kropp.roll ?? "arbetare").trim();
+  if (!ROLLER.includes(roll as typeof ROLLER[number])) {
+    return fel(req, `Okand roll: ${roll}`);
+  }
   const email = (kropp.email ?? "").trim().toLowerCase();
   const password = kropp.password ?? "";
 
@@ -190,6 +201,7 @@ Deno.serve(async (req) => {
     // workers.email sanningen och den har kolumnen tom.
     email: workerId ? null : email,
     status: "aktiv",
+    role: roll,
   });
 
   if (kontoFel) {
