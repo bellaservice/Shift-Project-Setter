@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/useQuery";
 import type { StamplaPass } from "@/lib/types";
 import { stamplaIn, stamplaUt } from "./actions";
+import { farLeda } from "@/lib/roller";
 
 /**
  * Stamplingen — arbetarens skarm (spec Fas 3).
@@ -127,7 +128,7 @@ export default function StamplaPage() {
         <EmptyState
           title="Det har kontot ar inte kopplat till nagon arbetare."
           hint={
-            roll === "arbetsledare"
+            farLeda(roll)
               ? "Stamplingen hor till den som gar passen — du bekraftar dem i stallet. Vill du lagga ut ett pass gor du det har."
               : "Stamplingen hor till den som gar passen. Ett konto for kontoret har inga egna pass att stampla pa."
           }
@@ -135,7 +136,7 @@ export default function StamplaPage() {
              kommit for att det INTE fanns nagra pass, och da ar vagen framat
              att lagga ut ett — inte att backa ut till startsidan. */
           action={
-            roll === "arbetsledare" ? (
+            farLeda(roll) ? (
               <ButtonLink href="/skapa-pass" size="md">
                 Skapa Pass
               </ButtonLink>
@@ -162,7 +163,7 @@ export default function StamplaPage() {
             <EmptyState
               title="Inga pass att stampla pa just nu."
               hint={
-                roll === "arbetsledare"
+                farLeda(roll)
                   ? "Har visas pass for idag och igar. Finns inga alls ar de troligen inte utlagda an — lagg ut dem med Skapa Pass."
                   : "Har visas dina pass for idag och igar. Saknas ett du ska ga — sag till din arbetsledare."
               }
@@ -170,7 +171,7 @@ export default function StamplaPage() {
                  lamna skarmen for att komma vidare, och for en arbetare finns
                  ingenting harifran att gora at saken. */
               action={
-                roll === "arbetsledare" ? (
+                farLeda(roll) ? (
                   <ButtonLink href="/skapa-pass" size="md">
                     Skapa Pass
                   </ButtonLink>

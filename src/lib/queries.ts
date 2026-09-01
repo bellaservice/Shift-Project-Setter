@@ -671,7 +671,7 @@ export async function getMonthCalendar(
     supabase
       .from("shifts")
       .select(
-        "shift_date, hours, worker_id, projects!inner(deleted_at), workers!inner(deleted_at)"
+        "shift_date, hours, status, worker_id, projects!inner(deleted_at), workers!inner(deleted_at)"
       )
       .is("projects.deleted_at", null)
       .is("workers.deleted_at", null)
@@ -729,7 +729,17 @@ export async function getMonthCalendar(
 
   for (const s of rawShifts) {
     const day = cell(s.shift_date);
-    day.hours += hoursForSum(s.hours);
+    // Bara BEKRAFTADE timmar i summan.
+    //
+    // Passet raknas anda med bland dagens arbetare nedan -- det ar utlagt och
+    // nagon ska ga det -- men dess timmar ar en PLAN tills arbetsledaren
+    // bekraftat dem. Manadssumman under rutnatet byggs av den har siffran, och
+    // en plan som raknas som arbetad tid ar samma fel som overallt annars i
+    // filen: se hoursForSum och `status`-filtren pa fragorna ovan.
+    //
+    // Fram till Skapa Pass fick sin timruta var `hours` null pa varje oppet
+    // pass, sa den har raden var korrekt utan filter. Den ar det inte langre.
+    if (s.status === "confirmed") day.hours += hoursForSum(s.hours);
     // En mängd av NAMN och inte av id:n: två pass på samma arbetare samma dag
     // är en person på plats, och rutan ska inte skriva ut henne två gånger.
     day.workers.add(nameById.get(s.worker_id) ?? "Okand arbetare");
@@ -765,7 +775,7 @@ export async function getDayLog(
     supabase
       .from("shifts")
       .select(
-        "id, worker_id, project_id, hours, start_time, end_time, projects!inner(deleted_at), workers!inner(deleted_at)"
+        "id, worker_id, project_id, hours, status, start_time, end_time, projects!inner(deleted_at), workers!inner(deleted_at)"
       )
       .eq("shift_date", date)
       .is("projects.deleted_at", null)
@@ -814,6 +824,7 @@ export async function getDayLog(
       projectId: s.project_id,
       projectName: projectById.get(s.project_id) ?? "Okant project",
       hours: readHours(s.hours),
+      status: String(s.status),
       startTime: s.start_time ? s.start_time.slice(0, 5) : null,
       endTime: s.end_time ? s.end_time.slice(0, 5) : null,
     }))

@@ -52,8 +52,17 @@ export type Shift = {
   project_id: string;
   worker_id: string;
   shift_date: string;
-  /** Null tills arbetsledaren bekräftat passet (spec 5.3) — aldrig noll timmar. */
+  /**
+   * Passets timtal, eller null när det inte har något.
+   *
+   * ⚠️ Ett tal här betyder INTE att passet är bekräftat. Sedan Skapa Pass fick
+   * sin timruta föds ett schemalagt pass med ett PLANERAT timtal i samma
+   * kolumn, och `status` är det enda som skiljer en plan från ett utfall. Den
+   * som summerar måste läsa båda.
+   */
   hours: number | null;
+  /** 'open' | 'closed' | 'confirmed'. Se `hours` ovan — de hör ihop. */
+  status: string;
   /** "Pass Tider". Postgres `time`, so 'HH:MM:SS'. Null on rows logged before
    *  the columns existed; paired by shifts_pass_times_paired. */
   start_time: string | null;
@@ -334,8 +343,16 @@ export type DayShift = {
   projectId: string;
   /** Project Namn, med adressen som reserv — alltid `projectLabel`. */
   projectName: string;
-  /** Null tills arbetsledaren bekräftat passet (spec 5.3) — aldrig noll timmar. */
+  /**
+   * Passets timtal, eller null när det inte har något.
+   *
+   * ⚠️ Ett tal här betyder INTE att passet är bekräftat — se `status`. Ett
+   * schemalagt pass föds numera med ett PLANERAT timtal i samma kolumn, så
+   * dagens summa i <CalendarDaySheet> läser båda fälten.
+   */
   hours: number | null;
+  /** 'open' | 'closed' | 'confirmed'. Hör ihop med `hours` ovan. */
+  status: string;
   /** 'HH:MM', eller null när passet loggades utan Pass Tider. */
   startTime: string | null;
   endTime: string | null;

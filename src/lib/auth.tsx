@@ -25,8 +25,16 @@ import { getSupabase } from "@/lib/supabase/browser";
  * through the admin API. Nothing new is minted here; this only signs them in.
  */
 
-/** Approllen, som `accounts_role_check` stavar den. */
-export type Roll = "admin" | "arbetsledare" | "arbetare";
+/**
+ * Approllen, som `accounts_role_check` stavar den.
+ *
+ * Aterexporterad och inte omdeklarerad. Typen stod skriven pa tva stallen, och
+ * tva listor over samma tre strangar ar en list for lite: den dag en fjarde roll
+ * laggs till i den ena fortsatter den andra att kompilera, och skillnaden syns
+ * forst nar nagot beter sig fel i drift.
+ */
+export type { Roll } from "@/lib/types";
+import type { Roll } from "@/lib/types";
 
 type AuthState = {
   session: Session | null;

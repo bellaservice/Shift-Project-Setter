@@ -79,9 +79,17 @@ export function CalendarDaySheet({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  // Ett obekräftat pass bidrar med ingenting till dagens summa — det har inget
-  // bekräftat timtal än, och noll vore ett påstående om att det inte fanns.
-  const totalHours = shifts.reduce((sum, s) => sum + (s.hours ?? 0), 0);
+  // Ett obekräftat pass bidrar med ingenting till dagens summa.
+  //
+  // Villkoret stod tidigare i `s.hours ?? 0` ensamt, och det RÄCKTE så länge ett
+  // obekräftat pass alltid hade null i kolumnen. Sedan Skapa Pass fick sin
+  // timruta föds ett schemalagt pass med ett planerat timtal, så nollan kom
+  // tillbaka som en riktig siffra och dagens summa började räkna arbete som
+  // ingen ännu utfört. `status` är det enda som skiljer de två.
+  const totalHours = shifts.reduce(
+    (sum, s) => sum + (s.status === "confirmed" ? s.hours ?? 0 : 0),
+    0
+  );
 
   return (
     <div
