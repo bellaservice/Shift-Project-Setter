@@ -113,5 +113,5 @@ export async function saveArbetsdagbokDetaljer(formData: FormData) {
   await savePassCorrections(formData);
 
 
-  return `/alla-project/arbetsdagbok?id=${projectId}&fortsatt=1`;
+  return `/arbetsdagbok?id=${projectId}&fortsatt=1`;
 }

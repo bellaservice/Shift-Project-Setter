@@ -4,9 +4,12 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Arbetsdagbok } from "@/components/Arbetsdagbok";
+import { DokumentVy } from "@/components/DokumentVy";
 import { Button, ButtonLink } from "@/components/Button";
 import { Warning } from "@/components/Icons";
 import { PanelSkeleton, Query } from "@/components/Query";
+import { PanelList, RowLink } from "@/components/Panel";
+import { projectLabel } from "@/lib/format";
 import { EmptyState, Screen } from "@/components/Screen";
 import {
   ArbetsdagbokSurvey,
@@ -18,6 +21,7 @@ import {
   getArbetsdagbokData,
   getPassProblems,
   getProjectDagSpann,
+  getProjects,
   getSenastePeriod,
   sparaPeriod,
 } from "@/lib/queries";
@@ -129,6 +133,16 @@ function ArbetsdagbokScreen() {
   const [ram, setRam] = useState<{ fran: string; till: string } | null>(null);
   /* Har utskriftsdialogen varit uppe? Sager inte att nagot sparades -- se
      ramkvittensen langre ned. */
+  /**
+   * Vilken halva som visas.
+   *
+   * Pa en telefon far bara en av dem plats: uppgifterna ar ett formular och
+   * dokumentet ar ett A4, och staplade pa varandra hamnar papperet en
+   * skarmlangd under kontrollerna som styr det -- man andrar ramen och ser inte
+   * vad som hande. Fran 1100px och upp star de sida vid sida i stallet och
+   * vaxeln goms, eftersom valet da inte finns att gora.
+   */
+  const [flik, setFlik] = useState<"detaljer" | "dokument">("detaljer");
   const [dialogenVarUppe, setDialogenVarUppe] = useState(false);
   const [ramSparad, setRamSparad] = useState(false);
 
@@ -164,6 +178,10 @@ function ArbetsdagbokScreen() {
     });
   }, [ram, utgangslage.data]);
 
+  /* Projectlistan for valjaren nedan. Hamtas aven nar ett project redan ar
+     valt: en krok far inte hoppas over, och listan ar en handfull rader. */
+  const projectLista = useQuery(() => getProjects(), []);
+
   const bundle = useQuery(async () => {
     if (!id || ram === null) return null;
     const [data, passProblems] = await Promise.all([
@@ -189,6 +207,56 @@ function ArbetsdagbokScreen() {
       ((missingQuestions(bundle.data.data).length > 0 ||
         bundle.data.passProblems.length > 0) &&
         fortsatt !== "1"));
+
+  /**
+   * Ingen ?id= — alltsa kom man hit via menyn och inte via ett project.
+   *
+   * Skarmen var fram till nu en atergrand fran Alla Project och kunde forutsatta
+   * att den fick ett project med sig. Som egen destination maste den i stallet
+   * FRAGA, annars mots den som trycker "Arbetsdagbok" i menyn av "Projectet
+   * finns inte" — ett felmeddelande om ett project hen aldrig valt.
+   */
+  if (!id) {
+    return (
+      <Screen
+        tone="amber"
+        eyebrow="Arbetsdagbok"
+        title="Vilket project?"
+        back={{ href: "/", label: "Hem" }}
+      >
+        <p className="mb-3 px-1 text-sm leading-relaxed text-white/65">
+          Dokumentet skrivs ut per project. Välj vilket, så ställs perioden in
+          därefter.
+        </p>
+        <Query state={projectLista}>
+          {(projects) =>
+            projects.length === 0 ? (
+              <EmptyState
+                title="Inga project än."
+                hint="Ett project är det arbetet loggas på. Lägg upp ett först."
+                action={
+                  <ButtonLink href="/logga-project" size="md">
+                    Logga Project
+                  </ButtonLink>
+                }
+              />
+            ) : (
+              <PanelList>
+                {projects.map((p) => (
+                  <RowLink
+                    key={p.id}
+                    href={`/arbetsdagbok?id=${p.id}`}
+                    title={projectLabel(p)}
+                    subtitle={p.name ? p.address : undefined}
+                  />
+                ))}
+              </PanelList>
+            )
+          }
+        </Query>
+      </Screen>
+    );
+  }
 
   if (bundle.data == null || gated) {
     return (
@@ -266,10 +334,45 @@ function ArbetsdagbokScreen() {
       tone="none"
       eyebrow="Arbetsdagbok"
       title={data.projectName}
-      back={{ href: "/alla-project", label: "Alla Project" }}
+      back={{ href: "/arbetsdagbok", label: "Byt project" }}
       wide
     >
-      <div className="ad-noprint mx-auto flex w-full max-w-md flex-col gap-3">
+      {/* Vaxeln. `xl:hidden` -- fran 1100px ryms bada och da ar den bara i
+          vagen. `ad-noprint` som allt annat som inte ar papper. */}
+      <div className="ad-noprint mx-auto mb-3 w-full max-w-md xl:hidden">
+        <div className="glass-flat flex gap-1 rounded-xl p-1">
+          <FlikKnapp
+            aktiv={flik === "detaljer"}
+            onClick={() => setFlik("detaljer")}
+            label="Detaljer"
+          />
+          <FlikKnapp
+            aktiv={flik === "dokument"}
+            onClick={() => setFlik("dokument")}
+            label="Dokument"
+          />
+        </div>
+      </div>
+
+      {/* INGEN `items-start` i kolumnlaget.
+
+          `items-start` far ett flexbarn att bli sa brett som dess INNEHALL i
+          stallet for sa brett som raden. DokumentVy mater sin egen ruta -- och
+          den rutan krympte da till det redan nedskalade arket, vilket gav en
+          mindre bredd, som gav en mindre skala, som gav en mindre bredd. Det
+          slutade omkring 150px pa en 390px-skarm: ett laslighetsproblem som
+          uppstod ur en matning som atit sitt eget resultat.
+
+          Utan den stracker sig kolumnen over hela bredden och matningen har
+          nagot fast att utga fran. `items-start` finns kvar i radlaget, dar den
+          gor det den ska: hindrar detaljkolumnen fran att bli lika hog som
+          dokumentet bredvid. */}
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-center">
+      <div
+        className={`ad-noprint w-full max-w-md shrink-0 flex-col gap-3 xl:flex ${
+          flik === "detaljer" ? "flex" : "hidden"
+        }`}
+      >
         {/* Ett project utan pass ger ett dokument utan rader. Det är giltigt —
             försättsbladet och signaturblocket står där — men det ser ut som ett
             fel om ingen säger varför, så det sags här och inte bara i dokumentet. */}
@@ -360,7 +463,47 @@ function ArbetsdagbokScreen() {
         </p>
       </div>
 
-      <Arbetsdagbok data={data} />
+      {/* Dokumentet.
+
+          `min-w-0` pa flexbarnet: utan den vagrar en flexkolumn krympa under
+          sitt innehalls naturliga bredd, och arket ar 794px brett -- alltsa
+          skulle DokumentVy mata en bredd som aldrig blev mindre an papperet och
+          aldrig krympa det. */}
+      <div
+        className={`w-full min-w-0 xl:block ${flik === "dokument" ? "block" : "hidden"}`}
+      >
+        <DokumentVy>
+          <Arbetsdagbok data={data} />
+        </DokumentVy>
+      </div>
+      </div>
     </Screen>
+  );
+}
+
+/**
+ * En halva av vaxeln. Samma form som "Arbetare / Ej arbetare" i Tillverka
+ * Konto -- tva lagen som utesluter varandra och bada ryms pa en rad.
+ */
+function FlikKnapp({
+  aktiv,
+  onClick,
+  label,
+}: {
+  aktiv: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={aktiv}
+      className={`h-11 flex-1 cursor-pointer rounded-lg text-sm font-bold transition-colors duration-200 ease-out motion-reduce:transition-none ${
+        aktiv ? "bg-night-accent text-black" : "text-white/60 active:bg-white/10"
+      }`}
+    >
+      {label}
+    </button>
   );
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormError } from "@/components/FormError";
 import { useState } from "react";
-import { saveArbetsdagbokDetaljer } from "@/app/alla-project/arbetsdagbok/actions";
+import { saveArbetsdagbokDetaljer } from "@/app/arbetsdagbok/actions";
 import { Button } from "@/components/Button";
 import { FIELD_BOX } from "@/components/Field";
 import {
@@ -177,7 +177,7 @@ export function ArbetsdagbokSurvey({
           enda vagen forbi en enkat som inte gar att svara pa, och den ska ga
           att traffa med tummen. Tyst yta, dock — den hoppar over ett steg. */}
       <Link
-        href={`/alla-project/arbetsdagbok?id=${projectId}&fortsatt=1`}
+        href={`/arbetsdagbok?id=${projectId}&fortsatt=1`}
         className="flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold text-white/70 underline decoration-white/30 underline-offset-4 transition-colors duration-200 ease-out active:text-white motion-reduce:transition-none"
       >
         Generera utan dessa uppgifter

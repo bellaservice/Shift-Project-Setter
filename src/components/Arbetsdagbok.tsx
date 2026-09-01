@@ -113,6 +113,50 @@ const DOCUMENT_CSS = `
      kapas förhandsvisningen på höjden av en sida den aldrig får se. */
   .app-shell { max-width: none; }
 
+  /* Arket krymper tills det får plats.
+
+     Ett A4 är 210mm — knappt 794px — och en telefon är 390. Utan det här
+     sticker papperet ut halvvägs utanför skärmen och hela sidan börjar glida i
+     sidled, vilket är det enda som får en app att kännas trasig snabbare än en
+     krasch. Alternativet, att låta arket rulla i sidled i sin egen ruta, ger en
+     halv sida i taget och gör förhandsvisningen oläslig som DOKUMENT — och det
+     är just som dokument man tittar på den.
+
+     transform: scale() och inte zoom. zoom ser enklare ut -- den krymper även
+     den plats elementet tar -- men vad den gör med mm-mått och med
+     getBoundingClientRect skiljer sig mellan webbläsare, och en förhandsvisning
+     som råkar hamna på halva sin tänkta storlek är svår att ens upptäcka: arket
+     ser rätt ut, bara mindre. En scale gör exakt en sak och gör den likadant
+     överallt.
+
+     Priset är att en scale INTE ändrar den plats elementet tar, så ytan runt om
+     måste få höjden satt åt sig. Båda talen räknas fram av DokumentVy och
+     skickas in som egenskaper.
+
+     Bara @media screen. På papper finns ingen skalning -- där ÄR arket A4, och
+     varken --ad-skala eller --ad-hojd läses. */
+  .ad-skalad-yta { overflow: hidden; height: var(--ad-hojd, auto); }
+  .ad-skalad {
+    width: 794px;
+    transform: scale(var(--ad-skala, 1));
+    transform-origin: top left;
+  }
+  /* Yttertabellen får INTE växa efter sitt innehåll.
+
+     .ad-pagegrid finns bara för utskriftens skull -- en tfoot är det enda en
+     webbläsare upprepar på varje sida -- men den är en tabell, och en tabell med
+     automatisk layout blir så bred som dess bredaste innehåll kräver, oavsett
+     vad föräldern säger. Dagtabellerna inuti arket ville ha 1890px, och då blev
+     hela ställningen 1890px inuti en 794px-behållare. Arket självt förblev
+     korrekta 210mm, men skalan räknades mot en yta som var dubbelt för bred, så
+     dokumentet ritades ut på ungefär 40% av avsedd storlek -- läsbart nog att
+     inte se ut som ett fel, litet nog att vara oläsligt.
+
+     table-layout: fixed låter första raden bestämma bredden i stället för
+     innehållet. Ställningen har en enda kolumn, så det finns inget att fördela
+     fel. Bara @media screen: utskriften har ingen skalning att räkna mot. */
+  .ad-skalad .ad-pagegrid { table-layout: fixed; width: 794px; }
+
   .ad-viewport { padding: 4mm 0; }
   .ad-sheet {
     width: 210mm;
@@ -138,24 +182,26 @@ const DOCUMENT_CSS = `
      egen, så förhandsvisningen har en sidfot per sida precis som utskriften. */
   .ad-pagefoot { display: none; }
 
-  /* Hela arkets bredd ska rymmas på skärmen — en avkapad förhandsvisning är
-     värdelös som förhandsvisning. Zoom och inte transform:scale, för zoom
-     krymper även layoutrutan; en transform hade lämnat kvar 794px tomrum.
-     Trappa i stället för calc(): CSS kan inte dela längd med längd, så det går
-     inte att räkna fram förhållandet 100vw / 794px. */
-  /* Trappans översta steg, och det enda som inte handlar om telefoner: mellan
-     859px och 948px fönsterbredd är arket i full skala (210mm ≈ 794px) bredare
-     än vad appskalets centrerade 672px-kolumn har kvar fram till högerkanten,
-     så hela SIDAN svämmar över i sidled — inte bara kolumnen. 0,80 ger 635px,
-     vilket ryms i kolumnens 640px innehållsbredd vid varje fönsterbredd över
-     858px. Utan steget klipper overflow-x: hidden i globals.css bort arkets
-     högerkant i stället för att visa den. */
-  @media (max-width: 948px) { .ad-viewport { zoom: 0.80; } }
-  @media (max-width: 858px) { .ad-viewport { zoom: 0.82; } }
-  @media (max-width: 700px) { .ad-viewport { zoom: 0.66; } }
-  @media (max-width: 560px) { .ad-viewport { zoom: 0.52; } }
-  @media (max-width: 440px) { .ad-viewport { zoom: 0.42; } }
-  @media (max-width: 360px) { .ad-viewport { zoom: 0.34; } }
+  /* HÄR LÅG EN ZOOM-TRAPPA. Den är borta, och det är värt en förklaring.
+     
+     Sex mediefrågor krympte .ad-viewport efter FÖNSTRETS bredd: 0,80 vid 948px
+     och nedåt, ända till 0,34 vid 360px. Den gjorde sitt jobb så länge arket var
+     det enda på sidan och alltså alltid lika brett som fönstret minus marginal.
+     
+     Sedan dokumentbyggaren fick två spalter stämmer det inte längre. Vid 1200px
+     fönsterbredd säger trappan "ingen skalning" -- men dokumentspalten är då
+     bara omkring 700px, och arket hade svämmat över den. Frågan är inte hur brett
+     FÖNSTRET är utan hur bred RUTAN är, och det kan CSS inte svara på: en
+     container query hade kunnat, men inte räkna fram förhållandet 794px / rutan,
+     eftersom CSS inte kan dela längd med längd. Det var också därför det blev en
+     trappa och inte en calc() från början.
+     
+     DokumentVy mäter rutan i stället och skickar in faktorn. Se .ad-skalad ovan.
+     
+     ⚠️ Trappan och den nya skalningen får ALDRIG finnas samtidigt: de
+     multipliceras. Under en stund gjorde de det, och 0,42 × 0,45 ritade ut
+     dokumentet på 19% av rätt storlek -- fortfarande ett prydligt A4, bara
+     obegripligt litet, vilket är precis den sortens fel man tittar förbi. */
 }
 
 @media print {

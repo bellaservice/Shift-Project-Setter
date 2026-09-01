@@ -521,7 +521,7 @@ export async function getArbetsdagbokData(
   // `hoursForSum` hade gjort den till en nolla, och en nolla i det här
   // dokumentet läses som "arbetaren var här och jobbade inte", inte som "det
   // här är inte klart än". Den räknas i stället, och räkningen stänger grinden
-  // i alla-project/arbetsdagbok/page.tsx (spec avsnitt 7).
+  // i arbetsdagbok/page.tsx (spec avsnitt 7).
   const byDate = new Map<string, ArbetsdagbokDay>();
   let totalHours = 0;
   let obekraftade = 0;

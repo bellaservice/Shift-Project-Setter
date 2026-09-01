@@ -38,6 +38,12 @@ const NAV: { href: string; label: string; bara?: "leder" | "arbetare" }[] = [
   // Skarmen har funnits hela tiden men bara natts fran Kalendern och
   // Arbetsdagboken -- alltsa aldrig av den som bara ville lagga ett pass.
   { href: "/logga-timmar", label: "Snabb Pass", bara: "leder" },
+  // Dokumentbyggaren. Lag forut under Alla Project och nåddes bara genom att
+  // trycka pa ett project och sedan pa en rad i arket som fallde ut -- tva steg
+  // in i ett arkiv, for det man kommer till appen for att gora en gang i
+  // manaden. Nu ar den en destination, och fragar sjalv vilket project det
+  // galler.
+  { href: "/arbetsdagbok", label: "Arbetsdagbok", bara: "leder" },
   { href: "/bekrafta", label: "Bekrafta Pass", bara: "leder" },
 ];
 
