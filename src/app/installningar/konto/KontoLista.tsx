@@ -10,6 +10,7 @@ import { getKonton } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/useQuery";
 import { satsRoll } from "./actions";
+import { MinaUppgifter } from "./MinaUppgifter";
 import { farLeda } from "@/lib/roller";
 
 /**
@@ -54,18 +55,16 @@ export function KontoLista() {
   // befogenheter. Bada hor till arbetsledaren. Grinden ar artighet -- RLS
   // avvisar en arbetares skrivning oavsett -- men en skarm full av knappar som
   // alltid misslyckas ar inte ett vanligt bemotande.
+  /**
+   * Arbetaren far INTE listan -- men hon far sina egna uppgifter.
+   *
+   * Har stod tidigare "Den har skarmen ar arbetsledarens", vilket var sant om
+   * listan och fel om skarmen: den heter Konto, och hennes eget konto finns
+   * har, med tomma falt som bara hon kan fylla i. Ett besked om att ga nagon
+   * annanstans var svar pa en fraga hon inte stallt.
+   */
   if (!rollLoading && !farLeda(roll)) {
-    return (
-      <EmptyState
-        title="Den har skarmen ar arbetsledarens."
-        hint="Konton och roller skots av arbetsledaren. Dina egna pass stamplar du in och ut pa under Stampla."
-        action={
-          <ButtonLink href="/stampla" size="md">
-            Stampla
-          </ButtonLink>
-        }
-      />
-    );
+    return <MinaUppgifter />;
   }
 
   return (
