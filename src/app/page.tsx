@@ -7,7 +7,7 @@ import { ArbetareHem } from "@/components/ArbetareHem";
 import { getArbetareHem } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/useQuery";
-import { farLeda } from "@/lib/roller";
+import { arAdmin, farLeda } from "@/lib/roller";
 
 /**
  * Hem.
@@ -64,11 +64,20 @@ export default function Home() {
           }
         </Query>
       ) : (
-        /* Arbetsledarens hela Hem. Skapa Pass forst: det ar det som ska handa,
-           och bekraftelsen kommer efterat i tiden precis som pa skarmen. */
+        /* Ledarens hela Hem. Skapa Pass forst: det ar det som ska handa, och
+           bekraftelsen kommer efterat i tiden precis som pa skarmen.
+
+           Logga Project sist, och bara for adminen. Ordningen foljer hur ofta
+           man gor sakerna: pass laggs ut och bekraftas varje vecka, ett nytt
+           project kommer till nagon gang ibland. Sist ar ocksa ratt plats for
+           den enda raden som inte handlar om en dags arbete utan om vad arbetet
+           bokfors pa. */
         <div className="flex flex-col gap-2.5">
           <ActionRow href="/skapa-pass" label="Skapa Pass" />
           <ActionRow href="/bekrafta" label="Bekrafta Pass" />
+          {arAdmin(roll) && (
+            <ActionRow href="/logga-project" label="Logga Project" />
+          )}
         </div>
       )}
     </Screen>
