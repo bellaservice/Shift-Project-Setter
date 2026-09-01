@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronRight } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
-import { farLeda } from "@/lib/roller";
+import { arAdmin, farLeda } from "@/lib/roller";
 
 /**
  * Menyn ar avsiktligt kortare an appen.
@@ -26,7 +26,7 @@ import { farLeda } from "@/lib/roller";
  * de har lankarna. Det som faktiskt haller ar RLS och
  * kit.shifts_guard_leader_columns(). Se kommentaren i src/lib/auth.tsx.
  */
-const NAV: { href: string; label: string; bara?: "leder" | "arbetare" }[] = [
+const NAV: { href: string; label: string; bara?: "leder" | "arbetare" | "admin" }[] = [
   { href: "/", label: "Hem" },
   // Arbetarens enda handling i appen, och darfor hogt upp: den som ska stampla
   // in star oftast i en port med telefonen i ena handen.
@@ -45,6 +45,20 @@ const NAV: { href: string; label: string; bara?: "leder" | "arbetare" }[] = [
   // galler.
   { href: "/arbetsdagbok", label: "Arbetsdagbok", bara: "leder" },
   { href: "/bekrafta", label: "Bekrafta Pass", bara: "leder" },
+  // Projecten, och de ar ADMINENS.
+  //
+  // Bada skarmarna har funnits hela tiden och ingen av dem har nagon rollgrind
+  // -- de blev bara oatkomliga nar menyn skars ned till arbetsledarens tva
+  // handlingar. "Logga Project" lag som knapp overst i Alla Project, sa nar den
+  // listan foll ur menyn foll vagen att SKAPA ett project med den, och en admin
+  // kunde inte lagga upp det project som allt annat i appen valjs ur.
+  //
+  // `admin` och inte `leder`: enligt uppdelningen ar det adminen som bestammer
+  // vilka project som finns, medan arbetsledaren lagger ut och bekraftar pass i
+  // dem. Grinden ar kosmetisk -- RLS pa projects fragar kit.ar_arbetsledare(),
+  // som svarar ja for bada -- men menyn ska visa arbetsfordelningen.
+  { href: "/alla-project", label: "Alla Project", bara: "admin" },
+  { href: "/logga-project", label: "Logga Project", bara: "admin" },
 ];
 
 /** Vilken av de tre man star pa. Exakt matchning for Hem, prefix for de andra,
@@ -69,13 +83,12 @@ export function NavMenu() {
   // `bara: "leder"` och inte `bara: "arbetsledare"`: med tre roller ar fragan
   // inte langre vilken roll man HAR utan vad den far gora, och en jamforelse mot
   // strangen "arbetsledare" hade last ute adminen ur ledarens egna skarmar.
-  const synligaNav = NAV.filter((item) =>
-    item.bara === undefined
-      ? true
-      : item.bara === "leder"
-        ? farLeda(roll)
-        : !farLeda(roll)
-  );
+  const synligaNav = NAV.filter((item) => {
+    if (item.bara === undefined) return true;
+    if (item.bara === "admin") return arAdmin(roll);
+    if (item.bara === "leder") return farLeda(roll);
+    return !farLeda(roll);
+  });
 
   useEffect(() => {
     if (!open) return;
